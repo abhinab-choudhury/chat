@@ -141,7 +141,7 @@ function LoginPage() {
 							<TwitterIcon className="inline-start" />
 							{pendingProvider === "twitter"
 								? "Connecting..."
-								: "Continue with Twitter (X)"}
+								: "Continue with Twitter"}
 						</Button>
 					</div>
 
@@ -177,7 +177,7 @@ function LoginPage() {
 						) : (
 							<form onSubmit={(e) => void verifyOtp(e)} className="space-y-3">
 								<div className="flex flex-col items-center space-y-2">
-									<div className="flex items-center justify-between gap-2">
+									<div className="flex items-center justify-between min-w-[80%] gap-2">
 										<Label htmlFor="otp">One-time code</Label>
 										<Button
 											type="button"

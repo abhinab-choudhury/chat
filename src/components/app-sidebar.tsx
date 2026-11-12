@@ -23,6 +23,7 @@ import {
 	useSidebar,
 } from "#/components/ui/sidebar";
 import { authClient } from "#/lib/auth-client";
+import { AppIcon } from "./brand-icons";
 
 export function AppSidebar() {
 	const { state } = useSidebar();
@@ -38,10 +39,7 @@ export function AppSidebar() {
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader className="flex flex-row items-center gap-2 px-2 py-3">
-				<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-					<img src="icon.png" alt="" className="bg-white p-1 rounded-sm" />
-				</div>
-				{!collapsed ? <span className="font-semibold">Chat</span> : null}
+				{!collapsed ? <AppIcon className="h-8 mx-auto" /> : null}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
