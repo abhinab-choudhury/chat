@@ -151,7 +151,7 @@ function LoginPage() {
 						<Separator className="flex-1" />
 					</div>
 
-					<div className="min-h-[8.5rem]">
+					<div className="min-h-28">
 						{step === "email" ? (
 							<form onSubmit={(e) => void sendOtp(e)} className="space-y-3">
 								<div className="space-y-2">
@@ -182,7 +182,7 @@ function LoginPage() {
 										<Button
 											type="button"
 											variant="link"
-											className="h-auto p-0 text-sm"
+											className="h-auto p-0 text-xs"
 											onClick={() => setStep("email")}
 											disabled={isBusy}
 										>
