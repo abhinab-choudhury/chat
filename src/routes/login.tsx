@@ -176,7 +176,7 @@ function LoginPage() {
 							</form>
 						) : (
 							<form onSubmit={(e) => void verifyOtp(e)} className="space-y-3">
-								<div className="items-center space-y-2">
+								<div className="flex flex-col items-center space-y-2">
 									<div className="flex items-center justify-between gap-2">
 										<Label htmlFor="otp">One-time code</Label>
 										<Button
