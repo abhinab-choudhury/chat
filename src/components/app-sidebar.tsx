@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	LogOutIcon,
 	MessageSquareIcon,
@@ -39,7 +39,7 @@ export function AppSidebar() {
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader className="flex flex-row items-center gap-2 px-2 py-3">
-				{!collapsed ? <AppIcon className="h-8 mx-auto" /> : null}
+				{!collapsed ? <div className="text-3xl font-bold mx-1.5">.Chat</div> : null}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
@@ -66,47 +66,73 @@ export function AppSidebar() {
 				</SidebarGroup>
 			</SidebarContent>
 			<SidebarFooter>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton tooltip="Settings">
-							<SettingsIcon className="size-4" />
+				<div className="flex flex-col gap-1 p-2">
+					{session?.user ? (
+						<Button
+							asChild
+							variant="ghost"
+							size="sm"
+							className="w-full justify-start"
+							title="Settings"
+						>
+							<Link to="/settings">
+								<SettingsIcon className="mr-2 size-4" />
+								{!collapsed ? <span>Settings</span> : null}
+							</Link>
+						</Button>
+					) : (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="w-full justify-start"
+							disabled
+							title="Settings (locked)"
+						>
+							<SettingsIcon className="mr-2 size-4" />
 							{!collapsed ? <span>Settings</span> : null}
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-					<SidebarMenuItem>
-						{session?.user ? (
-							<SidebarMenuButton
-								tooltip={session.user.name || session.user.email || "Account"}
+						</Button>
+					)}
+					{session?.user ? (
+						<>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="w-full justify-start"
+								title={session.user.name || session.user.email || "Account"}
 							>
-								<UserIcon className="size-4" />
+								<UserIcon className="mr-2 size-4" />
 								{!collapsed ? (
 									<span className="truncate">
 										{session.user.name || session.user.email}
 									</span>
 								) : null}
-							</SidebarMenuButton>
-						) : (
-							<SidebarMenuButton
-								tooltip="Sign in"
-								onClick={() => void navigate({ to: "/login" })}
-							>
-								<UserIcon className="size-4" />
-								{!collapsed ? <span>Sign in</span> : null}
-							</SidebarMenuButton>
-						)}
-					</SidebarMenuItem>
-					{session?.user ? (
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Sign out"
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="w-full justify-start"
+								title="Sign out"
 								onClick={() => void handleSignOut()}
 							>
-								<LogOutIcon className="size-4" />
+								<LogOutIcon className="mr-2 size-4" />
 								{!collapsed ? <span>Sign out</span> : null}
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-					) : null}
-				</SidebarMenu>
+							</Button>
+						</>
+					) : (
+						<Button
+							asChild
+							variant="ghost"
+							size="sm"
+							className="w-full justify-start"
+							title="Sign in"
+						>
+							<Link to="/login">
+								<UserIcon className="mr-2 size-4" />
+								{!collapsed ? <span>Sign in</span> : null}
+							</Link>
+						</Button>
+					)}
+				</div>
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>

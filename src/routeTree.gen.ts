@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChatRouteImport } from './routes/_chat'
-import { Route as LandingRouteImport } from './routes/landing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat.library'
@@ -20,11 +19,6 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const ChatRoute = ChatRouteImport.update({
   id: '/_chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LandingRoute = LandingRouteImport.update({
-  id: '/landing',
-  path: '/landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -60,7 +54,6 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
-  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/library': typeof ChatLibraryRoute
   '/settings/*': typeof SettingsChar42Route
@@ -68,7 +61,6 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
-  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/library': typeof ChatLibraryRoute
   '/settings/*': typeof SettingsChar42Route
@@ -79,7 +71,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
-  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/_chat/library': typeof ChatLibraryRoute
   '/settings/*': typeof SettingsChar42Route
@@ -91,7 +82,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/landing'
     | '/login'
     | '/library'
     | '/settings/*'
@@ -99,7 +89,6 @@ export interface FileRouteTypes {
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/landing'
     | '/login'
     | '/library'
     | '/settings/*'
@@ -109,7 +98,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_chat'
-    | '/landing'
     | '/login'
     | '/_chat/library'
     | '/settings/*'
@@ -120,7 +108,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
-  LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
   SettingsChar42Route: typeof SettingsChar42Route
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -133,13 +120,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/landing': {
-      id: '/landing'
-      path: '/landing'
-      fullPath: '/landing'
-      preLoaderRoute: typeof LandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -203,7 +183,6 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
-  LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
   SettingsChar42Route: SettingsChar42Route,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

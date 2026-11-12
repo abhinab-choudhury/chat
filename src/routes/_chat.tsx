@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { AppSidebar } from "#/components/app-sidebar";
 import { ThemeToggle } from "#/components/theme-toggle";
 import {
@@ -16,18 +16,13 @@ function RouteComponent() {
 		<SidebarProvider>
 			<AppSidebar />
 			<SidebarInset>
-				<main className="flex flex-1 flex-col gap-4 p-4">
-					<div className="flex items-center gap-2">
-						<SidebarTrigger className="-ml-1" />
+				<header className="flex h-12 items-center gap-2 border-b border-border px-4">
+					<SidebarTrigger className="-ml-1" />
+					<div className="ml-auto flex items-center gap-2">
 						<ThemeToggle />
 					</div>
-					<div className="rounded-lg border bg-card p-6 text-card-foreground">
-						<h2 className="text-2xl font-bold">Welcome to Chat</h2>
-						<p className="mt-2 text-muted-foreground">
-							Start a conversation from the sidebar.
-						</p>
-					</div>
-				</main>
+				</header>
+				<Outlet />
 			</SidebarInset>
 		</SidebarProvider>
 	);
