@@ -117,6 +117,21 @@
   --sidebar-ring: oklch(0.442 0.017 285.786);
 }
 
+.dark body::before {
+  opacity: 0.1;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(96, 215, 207, 0.18), transparent 34%),
+    radial-gradient(circle at 78% 26%, rgba(110, 200, 154, 0.12), transparent 42%),
+    radial-gradient(circle at 42% 82%, rgba(96, 215, 207, 0.1), transparent 36%);
+}
+
+.dark body::after {
+  opacity: 0.06;
+  background-image:
+    linear-gradient(rgba(141, 229, 219, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(141, 229, 219, 0.04) 1px, transparent 1px);
+}
+
 @theme inline {
   --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);

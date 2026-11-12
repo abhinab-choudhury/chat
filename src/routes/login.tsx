@@ -196,9 +196,10 @@ function LoginPage() {
 										onChange={setOtp}
 									>
 										<InputOTPGroup>
-											{Array.from({ length: 6 }).map((_, i) => (
-												<InputOTPSlot key={i} index={i} />
-											))}
+											{Array.from({ length: 6 }).map((_, i) => {
+												// biome-ignore lint/suspicious/noArrayIndexKey: fixed length OTP slots
+												return <InputOTPSlot key={`slot-${i}`} index={i} />;
+											})}
 										</InputOTPGroup>
 									</InputOTP>
 								</div>

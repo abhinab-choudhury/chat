@@ -9,19 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChatRouteImport } from './routes/_chat'
+import { Route as LandingRouteImport } from './routes/landing'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ChatIndexRouteImport } from './routes/_chat.index'
+import { Route as ChatLibraryRouteImport } from './routes/_chat.library'
+import { Route as SettingsChar42RouteImport } from './routes/settings/*'
+import { Route as ChatThreadThreadIdRouteImport } from './routes/_chat.thread.$threadId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ChatRoute = ChatRouteImport.update({
+  id: '/_chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingRoute = LandingRouteImport.update({
+  id: '/landing',
+  path: '/landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatLibraryRoute = ChatLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => ChatRoute,
+} as any)
+const SettingsChar42Route = SettingsChar42RouteImport.update({
+  id: '/settings/*',
+  path: '/settings/*',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatThreadThreadIdRoute = ChatThreadThreadIdRouteImport.update({
+  id: '/thread/$threadId',
+  path: '/thread/$threadId',
+  getParentRoute: () => ChatRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -30,42 +59,87 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof ChatIndexRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
+  '/library': typeof ChatLibraryRoute
+  '/settings/*': typeof SettingsChar42Route
+  '/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
+  '/library': typeof ChatLibraryRoute
+  '/settings/*': typeof SettingsChar42Route
+  '/': typeof ChatIndexRoute
+  '/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_chat': typeof ChatRouteWithChildren
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
+  '/_chat/library': typeof ChatLibraryRoute
+  '/settings/*': typeof SettingsChar42Route
+  '/_chat/': typeof ChatIndexRoute
+  '/_chat/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/landing'
+    | '/login'
+    | '/library'
+    | '/settings/*'
+    | '/thread/$threadId'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/auth/$'
-  id: '__root__' | '/' | '/login' | '/api/auth/$'
+  to:
+    | '/landing'
+    | '/login'
+    | '/library'
+    | '/settings/*'
+    | '/'
+    | '/thread/$threadId'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/_chat'
+    | '/landing'
+    | '/login'
+    | '/_chat/library'
+    | '/settings/*'
+    | '/_chat/'
+    | '/_chat/thread/$threadId'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  ChatRoute: typeof ChatRouteWithChildren
+  LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
+  SettingsChar42Route: typeof SettingsChar42Route
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_chat': {
+      id: '/_chat'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing': {
+      id: '/landing'
+      path: '/landing'
+      fullPath: '/landing'
+      preLoaderRoute: typeof LandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -74,6 +148,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_chat/': {
+      id: '/_chat/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/library': {
+      id: '/_chat/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof ChatLibraryRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/settings/*': {
+      id: '/settings/*'
+      path: '/settings/*'
+      fullPath: '/settings/*'
+      preLoaderRoute: typeof SettingsChar42RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_chat/thread/$threadId': {
+      id: '/_chat/thread/$threadId'
+      path: '/thread/$threadId'
+      fullPath: '/thread/$threadId'
+      preLoaderRoute: typeof ChatThreadThreadIdRouteImport
+      parentRoute: typeof ChatRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -85,9 +187,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ChatRouteChildren {
+  ChatLibraryRoute: typeof ChatLibraryRoute
+  ChatIndexRoute: typeof ChatIndexRoute
+  ChatThreadThreadIdRoute: typeof ChatThreadThreadIdRoute
+}
+
+const ChatRouteChildren: ChatRouteChildren = {
+  ChatLibraryRoute: ChatLibraryRoute,
+  ChatIndexRoute: ChatIndexRoute,
+  ChatThreadThreadIdRoute: ChatThreadThreadIdRoute,
+}
+
+const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  ChatRoute: ChatRouteWithChildren,
+  LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
+  SettingsChar42Route: SettingsChar42Route,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

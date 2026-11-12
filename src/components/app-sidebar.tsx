@@ -1,6 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
-
-import { authClient } from "#/lib/auth-client";
+import {
+	LogOutIcon,
+	MessageSquareIcon,
+	PlusIcon,
+	SettingsIcon,
+	UserIcon,
+} from "lucide-react";
+import { Button } from "#/components/ui/button";
 import {
 	Sidebar,
 	SidebarContent,
@@ -16,14 +22,7 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "#/components/ui/sidebar";
-import { Button } from "#/components/ui/button";
-import {
-	LogOutIcon,
-	MessageSquareIcon,
-	PlusIcon,
-	SettingsIcon,
-	UserIcon,
-} from "lucide-react";
+import { authClient } from "#/lib/auth-client";
 
 export function AppSidebar() {
 	const { state } = useSidebar();
@@ -40,7 +39,7 @@ export function AppSidebar() {
 		<Sidebar collapsible="icon">
 			<SidebarHeader className="flex flex-row items-center gap-2 px-2 py-3">
 				<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-					<img src="icon.png" className="bg-white p-1 rounded-sm" />
+					<img src="icon.png" alt="" className="bg-white p-1 rounded-sm" />
 				</div>
 				{!collapsed ? <span className="font-semibold">Chat</span> : null}
 			</SidebarHeader>
