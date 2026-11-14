@@ -100,11 +100,11 @@ export function AppSidebar() {
 														<MessageSquareIcon className="size-4" />
 														{!collapsed ? (
 															generatingTitleThreadIds.includes(thread._id) ? (
-																<span className="inline-flex min-w-0 flex-1 items-center gap-2">
-																	<span className="truncate text-muted-foreground">
-																		{thread.title}
-																	</span>
-																	<span className="h-3 w-14 shrink-0 animate-pulse rounded bg-muted-foreground/20" />
+																<span
+																	className="inline-flex min-w-0 flex-1 items-center"
+																	aria-hidden="true"
+																>
+																	<span className="h-3.5 w-24 animate-pulse rounded bg-muted-foreground/20" />
 																</span>
 															) : (
 																<span className="truncate">{thread.title}</span>

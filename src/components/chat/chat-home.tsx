@@ -172,7 +172,7 @@ export function ChatHome() {
 
 	return (
 		<div className="flex flex-1 flex-col items-center px-4 pb-6 pt-20">
-			<div className="flex w-full max-w-2xl flex-1 flex-col gap-4">
+			<div className="flex w-full max-w-3xl flex-1 flex-col gap-4">
 				{!message.trim() && (
 					<>
 						<div className="text-left">
@@ -207,7 +207,7 @@ export function ChatHome() {
 			</div>
 
 			<div className="sticky bottom-0 z-20 mt-auto w-full px-4">
-				<div className="mx-auto w-full max-w-2xl">
+				<div className="mx-auto w-full max-w-3xl">
 					<ChatInput
 						value={message}
 						onChange={setMessage}
