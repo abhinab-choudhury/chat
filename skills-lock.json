@@ -268,6 +268,12 @@
       "skillPath": "better-auth/organization/SKILL.md",
       "computedHash": "e5b1238c3b62c789918fe397ed52787742e50944343de33f459629f29b0fe922"
     },
+    "posthog-instrumentation": {
+      "source": "PostHog/posthog-for-claude",
+      "sourceType": "github",
+      "skillPath": "skills/posthog-instrumentation/SKILL.md",
+      "computedHash": "b5cd0a9913c6cb0ddfe0a954fa1b1061dd81dd7d44fedb53db46ba8b14437368"
+    },
     "shadcn": {
       "source": "shadcn-ui/ui",
       "sourceType": "github",
