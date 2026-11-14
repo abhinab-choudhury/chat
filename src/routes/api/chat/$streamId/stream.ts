@@ -21,7 +21,10 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 					return new Response("Stream not found", { status: 404 });
 				}
 				return new Response(stream, {
-					headers: { "Content-Type": "text/plain; charset=utf-8" },
+					headers: {
+						"Content-Type": "application/x-ndjson; charset=utf-8",
+						"Cache-Control": "no-cache",
+					},
 				});
 			},
 		},

@@ -2,7 +2,13 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { CopyIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
+import {
+	ChevronDownIcon,
+	ChevronRightIcon,
+	CopyIcon,
+	PencilIcon,
+	RotateCcwIcon,
+} from "lucide-react";
 import * as React from "react";
 import { Streamdown } from "streamdown";
 import { ChatInput } from "#/components/chat/chat-input";
@@ -10,7 +16,10 @@ import { Markdown } from "#/components/markdown";
 import { Button } from "#/components/ui/button";
 import { Message, MessageContent } from "#/components/ui/message";
 import { useSession } from "#/hooks/auth-hooks";
-
+import {
+	readCachedMessages,
+	writeCachedMessages,
+} from "#/lib/local-chat-cache";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
@@ -47,6 +56,30 @@ function RouteComponent() {
 		api.messages.getMessages,
 		canView ? { threadId, userId: currentUserId ?? undefined } : "skip",
 	);
+	const cachedMessages = React.useMemo(
+		() => readCachedMessages(threadId) ?? [],
+		[threadId],
+	);
+	React.useEffect(() => {
+		if (messages && messages.length > 0) {
+			writeCachedMessages(
+				threadId,
+				messages.map(
+					(m: {
+						_id: string;
+						role: string;
+						content: string;
+						createdAt?: number;
+					}) => ({
+						_id: String(m._id),
+						role: m.role,
+						content: m.content,
+						createdAt: m.createdAt,
+					}),
+				),
+			);
+		}
+	}, [messages, threadId]);
 
 	const send = useMutation(api.messages.sendMessage).withOptimisticUpdate(
 		(localStore, args) => {
@@ -90,6 +123,8 @@ function RouteComponent() {
 	const selectedModel = useModelStore((s) => s.selectedModel);
 	const setSelectedModel = useModelStore((s) => s.setSelectedModel);
 	const [streamingText, setStreamingText] = React.useState("");
+	const [streamingReasoning, setStreamingReasoning] = React.useState("");
+	const [thinkingOpen, setThinkingOpen] = React.useState(false);
 	const isOwner =
 		!!thread && !!currentUserId && thread.userId === currentUserId;
 
@@ -176,6 +211,8 @@ function RouteComponent() {
 				});
 
 				setStreamingText("");
+				setStreamingReasoning("");
+				setThinkingOpen(false);
 
 				const res = await fetch("/api/chat", {
 					method: "POST",
@@ -194,14 +231,39 @@ function RouteComponent() {
 				const reader = res.body.getReader();
 				const decoder = new TextDecoder();
 				let accumulated = "";
+				let reasoningAccumulated = "";
+				let buffer = "";
+
+				const applyEvent = (line: string) => {
+					if (!line.trim()) return;
+					try {
+						const evt = JSON.parse(line) as { t?: string; d?: string };
+						if (evt.t === "r" && evt.d) {
+							reasoningAccumulated += evt.d;
+							setStreamingReasoning(reasoningAccumulated);
+						} else if (evt.t === "t" && evt.d) {
+							accumulated += evt.d;
+							setStreamingText(accumulated);
+						}
+					} catch {
+						// Fallback: treat as plain text chunk
+						accumulated += line;
+						setStreamingText(accumulated);
+					}
+				};
+
 				while (true) {
 					const { done, value } = await reader.read();
 					if (done) break;
-					accumulated += decoder.decode(value, { stream: true });
-					setStreamingText(accumulated);
+					buffer += decoder.decode(value, { stream: true });
+					const lines = buffer.split("\n");
+					buffer = lines.pop() ?? "";
+					for (const line of lines) applyEvent(line);
 				}
+				if (buffer) applyEvent(buffer);
 
 				setStreamingText("");
+				setStreamingReasoning("");
 				if (accumulated.trim()) {
 					await send({
 						clientUuid: crypto.randomUUID(),
@@ -215,6 +277,7 @@ function RouteComponent() {
 			} catch (e) {
 				console.error(e);
 				setStreamingText("");
+				setStreamingReasoning("");
 			} finally {
 				sendingRef.current = false;
 				setBusy(false);
@@ -258,6 +321,8 @@ function RouteComponent() {
 		if (busy || sendingRef.current) return;
 		resumedRef.current = true;
 		setStreamingText("");
+		setStreamingReasoning("");
+		setThinkingOpen(false);
 		(async () => {
 			try {
 				const res = await fetch(`/api/chat/${thread.currentStreamId}/stream`);
@@ -268,13 +333,36 @@ function RouteComponent() {
 				const reader = res.body.getReader();
 				const decoder = new TextDecoder();
 				let accumulated = "";
+				let reasoningAccumulated = "";
+				let buffer = "";
+				const applyEvent = (line: string) => {
+					if (!line.trim()) return;
+					try {
+						const evt = JSON.parse(line) as { t?: string; d?: string };
+						if (evt.t === "r" && evt.d) {
+							reasoningAccumulated += evt.d;
+							setStreamingReasoning(reasoningAccumulated);
+						} else if (evt.t === "t" && evt.d) {
+							accumulated += evt.d;
+							setStreamingText(accumulated);
+						}
+					} catch {
+						accumulated += line;
+						setStreamingText(accumulated);
+					}
+				};
 				while (true) {
 					const { done, value } = await reader.read();
 					if (done) break;
-					accumulated += decoder.decode(value, { stream: true });
-					setStreamingText(accumulated);
+					buffer += decoder.decode(value, { stream: true });
+					const lines = buffer.split("\n");
+					buffer = lines.pop() ?? "";
+					for (const line of lines) applyEvent(line);
 				}
+				if (buffer) applyEvent(buffer);
+
 				setStreamingText("");
+				setStreamingReasoning("");
 				if (accumulated.trim()) {
 					await send({
 						clientUuid: crypto.randomUUID(),
@@ -343,7 +431,12 @@ function RouteComponent() {
 			>
 				<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
 					{(() => {
-						const list = [...(messages ?? [])] as Array<{
+						const source = (messages ?? cachedMessages ?? []) as Array<{
+							_id: string;
+							role: string;
+							content: string;
+						}>;
+						const list = [...source] as Array<{
 							_id: string;
 							role: string;
 							content: string;
@@ -476,24 +569,54 @@ function RouteComponent() {
 							);
 						},
 					)}
-					{busy && streamingText && (
-						<Message align="start" className="w-full self-start">
-							<MessageContent className="select-text w-full text-sm">
-								<Streamdown
-									plugins={{ code, math }}
-									mode="static"
-									className="max-w-none w-full"
-								>
-									{streamingText}
-								</Streamdown>
-							</MessageContent>
-						</Message>
-					)}
-					{(busy || pendingAutoSend) && !streamingText && (
-						<div className="self-start text-xs text-muted-foreground">
-							Thinking…
-						</div>
-					)}
+					{(busy || pendingAutoSend) &&
+						(streamingReasoning || streamingText) && (
+							<Message align="start" className="w-full self-start">
+								<MessageContent className="select-text w-full text-sm">
+									{streamingReasoning ? (
+										<div className="mb-2 rounded-lg border border-border/60 bg-muted/20">
+											<button
+												type="button"
+												className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground"
+												onClick={() => setThinkingOpen((v) => !v)}
+												aria-expanded={thinkingOpen}
+											>
+												{thinkingOpen ? (
+													<ChevronDownIcon className="size-3.5" />
+												) : (
+													<ChevronRightIcon className="size-3.5" />
+												)}
+												<span>Thinking</span>
+												{!streamingText ? (
+													<span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70" />
+												) : null}
+											</button>
+											{thinkingOpen ? (
+												<div className="border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+													{streamingReasoning}
+												</div>
+											) : null}
+										</div>
+									) : null}
+									{streamingText ? (
+										<Streamdown
+											plugins={{ code, math }}
+											mode="static"
+											className="max-w-none w-full"
+										>
+											{streamingText}
+										</Streamdown>
+									) : null}
+								</MessageContent>
+							</Message>
+						)}
+					{(busy || pendingAutoSend) &&
+						!streamingText &&
+						!streamingReasoning && (
+							<div className="self-start text-xs text-muted-foreground">
+								Thinking…
+							</div>
+						)}
 				</div>
 			</div>
 			{!atBottom && (

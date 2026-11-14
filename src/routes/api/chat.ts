@@ -33,32 +33,60 @@ export const Route = createFileRoute("/api/chat")({
 					messages,
 				});
 
+				const encoder = new TextEncoder();
+				const eventStream = new ReadableStream<Uint8Array>({
+					async start(controller) {
+						const enqueue = (event: Record<string, unknown>) => {
+							controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+						};
+						try {
+							for await (const part of result.fullStream) {
+								if (part.type === "reasoning-delta" && "text" in part) {
+									const delta = (part as { text?: string }).text;
+									if (delta) enqueue({ t: "r", d: delta });
+								} else if (part.type === "text-delta" && "text" in part) {
+									const delta = (part as { text?: string }).text;
+									if (delta) enqueue({ t: "t", d: delta });
+								}
+							}
+							enqueue({ t: "e" });
+						} catch (error) {
+							enqueue({
+								t: "err",
+								d: error instanceof Error ? error.message : "Stream error",
+							});
+						} finally {
+							controller.close();
+						}
+					},
+				});
+
 				const ctx = getResumableStreamContext();
 				const streamId = body.streamId;
 
 				// If Redis-backed resumable streams are available and a streamId is
 				// provided, publish the stream so clients can reconnect/resume.
 				if (ctx && streamId) {
-					const textStream = new ReadableStream<string>({
-						async start(controller) {
-							for await (const chunk of result.textStream) {
-								controller.enqueue(chunk);
-							}
-							controller.close();
-						},
-					});
 					const resumable = await ctx.resumableStream(
 						streamId,
-						() => textStream,
+						() => eventStream,
 					);
 					if (resumable) {
 						return new Response(resumable, {
-							headers: { "Content-Type": "text/plain; charset=utf-8" },
+							headers: {
+								"Content-Type": "application/x-ndjson; charset=utf-8",
+								"Cache-Control": "no-cache",
+							},
 						});
 					}
 				}
 
-				return result.toTextStreamResponse();
+				return new Response(eventStream, {
+					headers: {
+						"Content-Type": "application/x-ndjson; charset=utf-8",
+						"Cache-Control": "no-cache",
+					},
+				});
 			},
 		},
 	},

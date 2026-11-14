@@ -4,6 +4,10 @@ import * as React from "react";
 import { Message, MessageContent } from "#/components/ui/message";
 import { useSession } from "#/hooks/auth-hooks";
 import { generateTitle } from "#/lib/ai.functions";
+import {
+	appendCachedMessage,
+	upsertCachedThread,
+} from "#/lib/local-chat-cache";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
@@ -78,6 +82,20 @@ export function ChatHome() {
 				clientUuid,
 			});
 
+			// Local sync cache: make sidebar/thread feel instant.
+			upsertCachedThread(userId, {
+				_id: String(threadId),
+				title: fallbackTitle,
+				updatedAt: Date.now(),
+				archived: false,
+			});
+			appendCachedMessage(String(threadId), {
+				_id: `local-user-${Date.now()}`,
+				role: "user",
+				content: trimmed,
+				createdAt: Date.now(),
+			});
+
 			// Generate and apply title in background (sidebar shows skeleton).
 			setGeneratingTitle(threadId, true);
 			void generateTitle({ data: { message: trimmed } })
@@ -85,6 +103,12 @@ export function ChatHome() {
 				.then((title) => {
 					if (title && title !== fallbackTitle) {
 						void renameThread({ threadId, title });
+						upsertCachedThread(userId, {
+							_id: String(threadId),
+							title,
+							updatedAt: Date.now(),
+							archived: false,
+						});
 					}
 				})
 				.catch(() => {})
