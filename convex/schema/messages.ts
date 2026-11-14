@@ -7,6 +7,8 @@ export const messages = defineTable({
 	content: v.string(),
 	// Optional model reasoning/thinking trace (hidden by default in UI)
 	reasoning: v.optional(v.string()),
+	// Optional AI tool trace, e.g. { webSearches: [{ query, state, results }] }
+	toolData: v.optional(v.any()),
 	authorId: v.optional(v.string()),
 	clientUuid: v.optional(v.string()),
 	createdAt: v.number(),

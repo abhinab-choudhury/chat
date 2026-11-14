@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { emailOTP, jwt, lastLoginMethod } from "better-auth/plugins";

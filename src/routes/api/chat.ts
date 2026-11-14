@@ -1,11 +1,18 @@
 import { createGoogle } from "@ai-sdk/google";
 import { createFileRoute } from "@tanstack/react-router";
-import { streamText } from "ai";
+import { isStepCount, streamText, tool } from "ai";
+import { z } from "zod";
 
 import { auth } from "#/lib/auth";
 import { convexApi, getConvexServerClient } from "#/lib/convex-server";
 import { ChatError, toChatError } from "#/lib/errors";
 import { getResumableStreamContext } from "#/lib/resumable-stream";
+import { SearchProvider } from "#/lib/search/search-provider";
+import {
+	summarizeResults,
+	type WebSearchToolCall,
+	type WebSearchToolData
+} from "#/lib/search/types";
 
 type ChatBody = {
 	messages?: Array<{ role: string; content: string }>;
@@ -14,7 +21,47 @@ type ChatBody = {
 	threadId?: string;
 	userId?: string;
 	assistantClientUuid?: string;
+	webSearch?: boolean;
 };
+
+const WEB_SEARCH_SYSTEM_PROMPT = `You have access to a web_search tool that searches the web for up-to-date information.
+
+Use it whenever the user asks about current events, recent developments, or anything your knowledge may be outdated on. Formulate a concise search query, review the returned results, and ground your answer in them. Cite the sources you used with inline markdown links like [title](url). Do not mention the tool itself in your answer.`;
+
+/** Builds the web_search AI tool. Ported from intern3-chat's WebSearchAdapter. */
+function createWebSearchTool() {
+	return tool({
+		description:
+			"Search the web for information. Returns a list of results with title, url and description.",
+		parameters: z.object({
+			query: z.string().describe("The search query"),
+		}),
+		execute: async ({ query }) => {
+			try {
+				const searchProvider = new SearchProvider();
+				const results = await searchProvider.search(query, {
+					limit: 5,
+					scrapeContent: true,
+					formats: ["markdown", "links"],
+				});
+				return {
+					success: true,
+					query,
+					results,
+					count: results.length,
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Unknown error occurred",
+					query,
+					results: [],
+				};
+			}
+		},
+	});
+}
 
 export const Route = createFileRoute("/api/chat")({
 	server: {
@@ -28,6 +75,8 @@ export const Route = createFileRoute("/api/chat")({
 				let assistantClientUuid: string | undefined;
 				let accumulated = "";
 				let reasoningAccumulated = "";
+				const webSearchToolCalls: WebSearchToolCall[] = [];
+				let webSearchToolData: WebSearchToolData | undefined;
 
 				const finalize = async () => {
 					if (finalized) return;
@@ -37,7 +86,9 @@ export const Route = createFileRoute("/api/chat")({
 					try {
 						if (
 							assistantClientUuid &&
-							(accumulated.trim() || reasoningAccumulated.trim())
+							(accumulated.trim() ||
+								reasoningAccumulated.trim() ||
+								(webSearchToolCalls.length ?? 0) > 0)
 						) {
 							await convex.mutation(convexApi.messages.sendMessage, {
 								clientUuid: assistantClientUuid,
@@ -45,6 +96,7 @@ export const Route = createFileRoute("/api/chat")({
 								role: "assistant",
 								content: accumulated,
 								reasoning: reasoningAccumulated.trim() || undefined,
+								toolData: webSearchToolData,
 								userId: effectiveUserId,
 							});
 						}
@@ -159,9 +211,23 @@ export const Route = createFileRoute("/api/chat")({
 						/hydrogen|thinking|reason/i.test(model) ||
 						model.includes("gemini-2.5") ||
 						model.includes("gemini-3");
+
+					// Web search tool (opt-in from the client's globe toggle).
+					const tools = body.webSearch
+						? { web_search: createWebSearchTool() }
+						: undefined;
+
 					const result = streamText({
 						model: google(model),
 						messages,
+						...(tools
+							? {
+									tools,
+									// Allow the model to continue after tool results.
+									stopWhen: isStepCount(10),
+									system: WEB_SEARCH_SYSTEM_PROMPT,
+								}
+							: {}),
 						...(wantsThinking
 							? {
 									providerOptions: {
@@ -199,6 +265,57 @@ export const Route = createFileRoute("/api/chat")({
 												accumulated += delta;
 												enqueue({ t: "t", d: delta });
 											}
+										} else if (part.type === "tool-call") {
+											const { input } = part as unknown as {
+												input?: { query?: string };
+											};
+											const call: WebSearchToolCall = {
+												query: input?.query ?? "",
+												state: "loading",
+											};
+											webSearchToolCalls.push(call);
+											enqueue({ t: "tool", d: JSON.stringify(call) });
+										} else if (part.type === "tool-result") {
+											const { input, output } = part as unknown as {
+												input?: { query?: string };
+												output?: {
+													success?: boolean;
+													results?: Array<{
+														url: string;
+														title: string;
+														description: string;
+													}>;
+													error?: string;
+												};
+											};
+											const call: WebSearchToolCall = {
+												query: input?.query ?? "",
+												state: "done",
+												results: output?.success
+													? summarizeResults(output.results ?? [])
+													: undefined,
+												error: output?.success ? undefined : output?.error,
+											};
+											// Merge into the matching pending call (same query).
+											let pendingIndex = -1;
+											for (let i = webSearchToolCalls.length - 1; i >= 0; i--) {
+												const pending = webSearchToolCalls[i];
+												if (pending.state === "loading" && pending.query === call.query) {
+													pendingIndex = i;
+													break;
+												}
+											}
+											if (pendingIndex !== -1) {
+												webSearchToolCalls[pendingIndex] = call;
+											} else {
+												webSearchToolCalls.push(call);
+											}
+											webSearchToolData = {
+												webSearches: webSearchToolCalls.filter(
+													(c) => c.state === "done",
+												),
+											};
+											enqueue({ t: "tool", d: JSON.stringify(call) });
 										} else if (part.type === "error") {
 											const err = (part as { error?: unknown }).error;
 											throw err instanceof Error
@@ -250,12 +367,32 @@ export const Route = createFileRoute("/api/chat")({
 
 					const ctx = getResumableStreamContext();
 					if (ctx && streamId) {
-						const resumable = await ctx.resumableStream(
-							streamId,
-							() => clientStream,
-						);
-						if (resumable) {
-							return new Response(resumable, { headers });
+						try {
+							// createNewResumableStream (not resumableStream): the INCR-based
+							// resumableStream can demote this POST to a passive listener if a
+							// resume GET already created the sentinel (the client marks the
+							// thread live before the stream is registered), leaving nobody
+							// recording and every later resume hanging. This call always
+							// makes this handler the recorder.
+							const resumable = await ctx.createNewResumableStream(
+								streamId,
+								() => clientStream,
+							);
+							if (resumable) {
+								// resumable-stream yields string chunks; encode to bytes for
+								// the HTTP response (same as intern3-chat's POST route).
+								return new Response(
+									resumable.pipeThrough(new TextEncoderStream()),
+									{ headers },
+								);
+							}
+						} catch (error) {
+							// A transient Redis failure must not fail the chat request;
+							// fall back to a direct stream (not resumable on reload).
+							console.error(
+								"[chat] resumable stream setup failed; streaming directly",
+								error,
+							);
 						}
 					}
 

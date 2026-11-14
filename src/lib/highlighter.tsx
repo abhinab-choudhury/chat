@@ -117,23 +117,41 @@ export async function loadHighlighter(language: string) {
 		// Returns one React node per line, and the grammar state after the last
 		// line. Pass that state back to continue where the code left off.
 		highlight(code: string, state?: GrammarState) {
+			// Very long lines tokenize extremely slowly in heavy grammars (e.g.
+			// rust, ~quadratic in line length), so they are rendered unstyled
+			// instead of freezing the UI. Fallbacks stay plain on failure.
 			const tokenize = (text: string) =>
 				shiki.codeToTokens(text, {
 					lang,
 					themes: { light: "github-light", dark: "github-dark" },
 					defaultColor: false,
 					grammarState: state,
+					tokenizeMaxLineLength: 2000,
 				}).tokens;
 
-			// ANSI has no grammar state, so each line is tokenized on its own and
-			// gets the same colors whether it arrives in one piece or streams.
-			const tokens =
-				lang === "ansi"
-					? code.split("\n").flatMap((line) => tokenize(line))
-					: tokenize(code);
+			const plain = (text: string) => [
+				text.split("\n").map((line, index) => (
+					<span
+						key={`line-${index}`}
+						className="text-[var(--shiki-light,#1f2328)] dark:text-[var(--shiki-dark,#e6edf3)]"
+					>
+						{line}
+					</span>
+				)),
+			];
 
-			return {
-				lines: tokens.map((line) =>
+			let lines: React.ReactNode[][];
+			let lastState: GrammarState | undefined;
+
+			try {
+				// ANSI has no grammar state, so each line is tokenized on its own and
+				// gets the same colors whether it arrives in one piece or streams.
+				const tokens =
+					lang === "ansi"
+						? code.split("\n").flatMap((line) => tokenize(line))
+						: tokenize(code);
+
+				lines = tokens.map((line) =>
 					line.map((token, index) => (
 						<span
 							key={`token-${line.length}-${index}`}
@@ -143,8 +161,18 @@ export async function loadHighlighter(language: string) {
 							{token.content}
 						</span>
 					)),
-				),
-				state: shiki.getLastGrammarState(tokens),
+				);
+
+				if (lang !== "ansi") {
+					lastState = shiki.getLastGrammarState(tokens);
+				}
+			} catch {
+				lines = plain(code);
+			}
+
+			return {
+				lines,
+				state: lastState,
 			};
 		},
 	};

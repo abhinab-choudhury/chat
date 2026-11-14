@@ -1,18 +1,18 @@
 import { Link } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 
-export function RouteErrorComponent({
-	error,
-	reset,
-}: {
-	error: Error;
-	reset: () => void;
-}) {
+export function RouteErrorComponent({ error, reset }: ErrorComponentProps) {
+	const message =
+		error instanceof Error
+			? error.message
+			: typeof error === "string"
+				? error
+				: "An unexpected error occurred.";
+
 	return (
 		<div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-6 text-center">
 			<h1 className="text-xl font-semibold">Something went wrong</h1>
-			<p className="max-w-md text-sm text-muted-foreground">
-				{error?.message || "An unexpected error occurred."}
-			</p>
+			<p className="max-w-md text-sm text-muted-foreground">{message}</p>
 			<div className="flex gap-2">
 				<button
 					type="button"

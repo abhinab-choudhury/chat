@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Redis from "ioredis";
 import { createResumableStreamContext } from "resumable-stream/ioredis";
 
@@ -19,15 +20,26 @@ function createRedisClient(url: string) {
 	return client;
 }
 
+let warnedDisabled = false;
+
 export function getResumableStreamContext() {
 	if (context) return context;
-	if (!redisUrl) return null;
+	if (!redisUrl) {
+		if (!warnedDisabled) {
+			warnedDisabled = true;
+			console.warn(
+				"[resumable-stream] REDIS_URL is not set; streams will NOT be resumable across page reloads. Set REDIS_URL and run Redis (docker compose up -d redis).",
+			);
+		}
+		return null;
+	}
 
 	try {
 		publisher = publisher ?? createRedisClient(redisUrl);
 		subscriber = subscriber ?? createRedisClient(redisUrl);
 		context = createResumableStreamContext({
-			waitUntil: null,
+			// Keep background reconnection promises tracked (intern3-chat pattern).
+			waitUntil: (promise) => promise,
 			publisher,
 			subscriber,
 		});
