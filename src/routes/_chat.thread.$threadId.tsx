@@ -268,7 +268,14 @@ function RouteComponent() {
 				});
 
 				if (!res.ok || !res.body) {
-					throw new Error(`Chat request failed: ${res.status}`);
+					let message = `Chat request failed: ${res.status}`;
+					try {
+						const err = (await res.clone().json()) as { message?: string };
+						if (err?.message) message = err.message;
+					} catch {
+						// ignore parse errors
+					}
+					throw new Error(message);
 				}
 
 				const reader = res.body.getReader();

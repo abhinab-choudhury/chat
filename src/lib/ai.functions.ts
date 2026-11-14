@@ -2,6 +2,8 @@ import { createGoogle } from "@ai-sdk/google";
 import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 
+import { ChatError } from "#/lib/errors";
+
 interface GenerateReplyInput {
 	messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 	model?: string;
@@ -64,7 +66,11 @@ export const generateReply = createServerFn({ method: "POST" })
 	.validator((data: GenerateReplyInput) => data)
 	.handler(async ({ data }) => {
 		const apiKey = process.env.GEMINI_API_KEY;
-		if (!apiKey) throw new Error("GEMINI_API_KEY is not set on the server.");
+		if (!apiKey) {
+			throw new ChatError("internal:api", {
+				cause: "GEMINI_API_KEY is not set on the server.",
+			});
+		}
 
 		const model = data.model || "gemini-3.5-flash-lite";
 		const google = createGoogle({ apiKey });
