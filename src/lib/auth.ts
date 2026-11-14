@@ -6,17 +6,19 @@ import Redis from "ioredis";
 
 import { db, schema } from "#/database";
 import { sendOtpEmail } from "#/lib/email";
+import { env } from "#/env";
 
 const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 
 const trustedOrigins = [
 	"https://chat.abhinab.tech",
 	process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
-	"http://localhost:3000",
+	...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000"] : []),
 ].filter((origin): origin is string => Boolean(origin));
 
 export const auth = betterAuth({
 	baseURL: process.env.BETTER_AUTH_URL,
+	secret: env.BETTER_AUTH_SECRET,
 	trustedOrigins,
 	database: drizzleAdapter(db, {
 		provider: "pg",

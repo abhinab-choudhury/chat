@@ -99,7 +99,10 @@ function LoginPage() {
 		setPendingProvider(provider);
 		setLoading(true);
 		try {
-			const { error } = await authClient.signIn.social({ provider });
+			const { error } = await authClient.signIn.social({
+				provider,
+				callbackURL: "/",
+			});
 			if (error) {
 				setError(error.message ?? `Failed to sign in with ${provider}`);
 			}
@@ -196,6 +199,7 @@ function LoginPage() {
 										suppressHydrationWarning
 										id="email"
 										type="email"
+										autoComplete="email"
 										value={email}
 										onChange={(e) => setEmail(e.target.value)}
 										required
@@ -265,7 +269,11 @@ function LoginPage() {
 					</div>
 
 					<div className="min-h-5">
-						{error ? <p className="text-sm text-destructive">{error}</p> : null}
+						{error ? (
+	<p role="alert" aria-live="polite" className="text-sm text-destructive">
+		{error}
+	</p>
+) : null}
 					</div>
 				</CardContent>
 			</Card>

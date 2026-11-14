@@ -346,7 +346,7 @@ function UserAccountSettings() {
 											const DeviceIcon = deviceInfo.icon;
 											const isCurrentSession =
 												sessionItem.id === currentSessionId ||
-												sessionItem.token === currentSessionId;
+												sessionItem.id === currentSessionId;
 
 											return (
 												<div
