@@ -138,7 +138,7 @@ export async function loadHighlighter(language: string) {
 						<span
 							key={`token-${line.length}-${index}`}
 							style={token.htmlStyle as React.CSSProperties}
-							className="text-(--shiki-light) dark:text-(--shiki-dark)"
+							className="text-[var(--shiki-light,#1f2328)] dark:text-[var(--shiki-dark,#e6edf3)]"
 						>
 							{token.content}
 						</span>

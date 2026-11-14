@@ -1,7 +1,7 @@
+import * as React from "react";
 import { FileCodeIcon } from "lucide-react";
 import mermaid from "mermaid";
 import { useTheme } from "next-themes";
-import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";

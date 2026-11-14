@@ -3,6 +3,11 @@
 @plugin '@tailwindcss/typography';
 @import 'tw-animate-css';
 
+/* Ensure Tailwind generates utility classes used by Streamdown (rendered in node_modules) */
+@source "../node_modules/streamdown/dist/**/*.js";
+@source "../node_modules/@streamdown/code/dist/**/*.js";
+@source "../node_modules/@streamdown/math/dist/**/*.js";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -230,4 +235,12 @@
 [data-streamdown="mermaid-block"] {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+/* Give Streamdown code blocks a themed two-tone background */
+[data-streamdown="code-block"] {
+  background-color: var(--muted);
+}
+[data-streamdown="code-block-body"] {
+  background-color: var(--card);
 }

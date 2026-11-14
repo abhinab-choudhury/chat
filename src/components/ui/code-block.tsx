@@ -11,7 +11,7 @@ const codeBlockVariants = cva(
 		variants: {
 			variant: {
 				default:
-					"border-border/50 bg-muted/20 dark:border-transparent dark:bg-card/40",
+					"border-border/50 bg-muted/40 dark:border-transparent dark:bg-card/60",
 				destructive:
 					"border-destructive/30 bg-destructive/5 text-foreground dark:bg-destructive/10",
 			},
@@ -187,7 +187,7 @@ function CodeBlockContent({
 			tabIndex={tabIndex}
 			className={cn(
 				"scroll-fade-x overflow-x-auto p-4 font-mono leading-relaxed outline-none",
-				"text-[13px] bg-muted text-foreground/90 selection:bg-primary/20 dark:text-foreground/85",
+				"text-[13px] bg-card text-foreground/90 selection:bg-primary/20 dark:text-foreground/85",
 				"group-data-[size=sm]/code-block:p-3 group-data-[size=sm]/code-block:text-xs",
 				wrap &&
 					"scroll-fade-y overflow-x-hidden whitespace-pre-wrap wrap-break-word",
