@@ -7,12 +7,12 @@ export const env = createEnv({
 		BETTER_AUTH_URL: z.url().optional(),
 		BETTER_AUTH_SECRET: z.string().min(1).optional(),
 		DATABASE_URL: z.string().min(1).optional(),
+		REDIS_URL: z.string().min(1).optional(),
 		GOOGLE_CLIENT_ID: z.string().min(1).optional(),
 		GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 		GITHUB_CLIENT_ID: z.string().min(1).optional(),
 		GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
-		TWITTER_CLIENT_ID: z.string().min(1).optional(),
-		TWITTER_CLIENT_SECRET: z.string().min(1).optional(),
+		VERCEL_URL: z.string().min(1).optional(),
 		SMTP_HOST: z.string().min(1).optional(),
 		SMTP_PORT: z.string().min(1).optional(),
 		SMTP_SECURE: z.string().optional(),
@@ -29,6 +29,8 @@ export const env = createEnv({
 
 	client: {
 		VITE_APP_TITLE: z.string().min(1).optional(),
+		VITE_POSTHOG_KEY: z.string().min(1).optional(),
+		VITE_POSTHOG_HOST: z.string().min(1).optional(),
 	},
 
 	/**

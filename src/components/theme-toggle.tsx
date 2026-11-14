@@ -32,6 +32,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 			variant="outline"
 			size="icon"
 			className={className}
+			suppressHydrationWarning
 			onClick={cycle}
 			aria-label={`Theme: ${label}. Click to switch.`}
 			title={`Theme: ${label}`}

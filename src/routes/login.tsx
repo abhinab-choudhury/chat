@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import * as React from "react";
-import { GithubIcon, GoogleIcon, TwitterIcon } from "#/components/brand-icons";
+import { GithubIcon, GoogleIcon, TwitchIcon } from "#/components/brand-icons";
 import { ThemeToggle } from "#/components/theme-toggle";
 import { Button } from "#/components/ui/button";
 import {
@@ -32,9 +32,14 @@ function LoginPage() {
 	const [step, setStep] = React.useState<"email" | "otp">("email");
 	const [loading, setLoading] = React.useState(false);
 	const [pendingProvider, setPendingProvider] = React.useState<
-		"google" | "github" | "twitter" | null
+		"google" | "github" | "twitch" | null
 	>(null);
 	const [error, setError] = React.useState<string | null>(null);
+	const [mounted, setMounted] = React.useState(false);
+
+	React.useEffect(() => {
+		setMounted(true);
+	}, []);
 
 	const isBusy = loading || pendingProvider !== null;
 
@@ -80,7 +85,7 @@ function LoginPage() {
 		}
 	};
 
-	const socialSignIn = async (provider: "google" | "github" | "twitter") => {
+	const socialSignIn = async (provider: "google" | "github" | "twitch") => {
 		setError(null);
 		setPendingProvider(provider);
 		setLoading(true);
@@ -112,9 +117,11 @@ function LoginPage() {
 					<CardDescription>Choose a method to continue</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<div className="grid gap-2">
+					<div className="grid gap-3">
 						<Button
+							suppressHydrationWarning
 							variant="outline"
+							className="relative"
 							onClick={() => void socialSignIn("google")}
 							disabled={isBusy}
 						>
@@ -122,9 +129,16 @@ function LoginPage() {
 							{pendingProvider === "google"
 								? "Connecting..."
 								: "Continue with Google"}
+							{mounted && authClient.isLastUsedLoginMethod("google") && (
+								<span className="absolute -top-2 -right-3  z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+									Last used
+								</span>
+							)}
 						</Button>
 						<Button
+							suppressHydrationWarning
 							variant="outline"
+							className="relative"
 							onClick={() => void socialSignIn("github")}
 							disabled={isBusy}
 						>
@@ -132,16 +146,28 @@ function LoginPage() {
 							{pendingProvider === "github"
 								? "Connecting..."
 								: "Continue with GitHub"}
+							{mounted && authClient.isLastUsedLoginMethod("github") && (
+								<span className="absolute -top-2 -right-3 z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+									Last used
+								</span>
+							)}
 						</Button>
 						<Button
+							suppressHydrationWarning
 							variant="outline"
-							onClick={() => void socialSignIn("twitter")}
+							className="relative"
+							onClick={() => void socialSignIn("twitch")}
 							disabled={isBusy}
 						>
-							<TwitterIcon className="inline-start" />
-							{pendingProvider === "twitter"
+							<TwitchIcon data-icon="inline-start" />
+							{pendingProvider === "twitch"
 								? "Connecting..."
-								: "Continue with Twitter"}
+								: "Continue with Twitch"}
+							{mounted && authClient.isLastUsedLoginMethod("twitch") && (
+								<span className="absolute -top-2 -right-3  z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+									Last used
+								</span>
+							)}
 						</Button>
 					</div>
 
@@ -157,6 +183,7 @@ function LoginPage() {
 								<div className="space-y-2">
 									<Label htmlFor="email">Email</Label>
 									<Input
+										suppressHydrationWarning
 										id="email"
 										type="email"
 										value={email}
@@ -166,11 +193,21 @@ function LoginPage() {
 										disabled={isBusy}
 									/>
 								</div>
-								<Button type="submit" className="w-full" disabled={isBusy}>
+								<Button
+									suppressHydrationWarning
+									type="submit"
+									className="relative w-full"
+									disabled={isBusy}
+								>
 									{loading && !pendingProvider ? (
 										<Spinner />
 									) : (
 										"Continue with email"
+									)}
+									{mounted && authClient.isLastUsedLoginMethod("email-otp") && (
+										<span className="absolute -top-2 -right-3  z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+											Last used
+										</span>
 									)}
 								</Button>
 							</form>
@@ -180,6 +217,7 @@ function LoginPage() {
 									<div className="flex items-center justify-between min-w-[80%] gap-2">
 										<Label htmlFor="otp">One-time code</Label>
 										<Button
+											suppressHydrationWarning
 											type="button"
 											variant="link"
 											className="h-auto p-0 text-xs"
@@ -204,6 +242,7 @@ function LoginPage() {
 									</InputOTP>
 								</div>
 								<Button
+									suppressHydrationWarning
 									type="submit"
 									className="w-full"
 									disabled={isBusy || otp.length < 6}

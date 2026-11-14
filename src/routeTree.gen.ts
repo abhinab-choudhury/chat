@@ -8,14 +8,23 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat.library'
-import { Route as SettingsChar42RouteImport } from './routes/settings/*'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as SettingsModelsRouteImport } from './routes/settings/models'
+import { Route as SettingsProfileRouteImport } from './routes/settings/profile'
 import { Route as ChatThreadThreadIdRouteImport } from './routes/_chat.thread.$threadId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiPhrSplatRouteImport } from './routes/api/phr/$'
+import { Route as ApiChatStreamIdStreamRouteImport } from './routes/api/chat/$streamId/stream'
+
+const SettingsRouteLazyRouteImport = createFileRoute('/settings')()
+const SettingsUsageLazyRouteImport = createFileRoute('/settings/usage')()
 
 const ChatRoute = ChatRouteImport.update({
   id: '/_chat',
@@ -26,6 +35,13 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRouteLazyRoute = SettingsRouteLazyRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/settings/route.lazy').then((d) => d.Route),
+)
 const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -36,11 +52,28 @@ const ChatLibraryRoute = ChatLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => ChatRoute,
 } as any)
-const SettingsChar42Route = SettingsChar42RouteImport.update({
-  id: '/settings/*',
-  path: '/settings/*',
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsModelsRoute = SettingsModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => SettingsRouteLazyRoute,
+} as any)
+const SettingsProfileRoute = SettingsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => SettingsRouteLazyRoute,
+} as any)
+const SettingsUsageLazyRoute = SettingsUsageLazyRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => SettingsRouteLazyRoute,
+} as any).lazy(() =>
+  import('./routes/settings/usage.lazy').then((d) => d.Route),
+)
 const ChatThreadThreadIdRoute = ChatThreadThreadIdRouteImport.update({
   id: '/thread/$threadId',
   path: '/thread/$threadId',
@@ -51,66 +84,114 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPhrSplatRoute = ApiPhrSplatRouteImport.update({
+  id: '/api/phr/$',
+  path: '/api/phr/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatStreamIdStreamRoute = ApiChatStreamIdStreamRouteImport.update({
+  id: '/$streamId/stream',
+  path: '/$streamId/stream',
+  getParentRoute: () => ApiChatRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/library': typeof ChatLibraryRoute
-  '/settings/*': typeof SettingsChar42Route
+  '/api/chat': typeof ApiChatRouteWithChildren
+  '/settings/models': typeof SettingsModelsRoute
+  '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageLazyRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/phr/$': typeof ApiPhrSplatRoute
+  '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/library': typeof ChatLibraryRoute
-  '/settings/*': typeof SettingsChar42Route
+  '/api/chat': typeof ApiChatRouteWithChildren
+  '/settings/models': typeof SettingsModelsRoute
+  '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageLazyRoute
   '/': typeof ChatIndexRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/phr/$': typeof ApiPhrSplatRoute
+  '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/_chat/library': typeof ChatLibraryRoute
-  '/settings/*': typeof SettingsChar42Route
+  '/api/chat': typeof ApiChatRouteWithChildren
+  '/settings/models': typeof SettingsModelsRoute
+  '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageLazyRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/phr/$': typeof ApiPhrSplatRoute
+  '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
+    | '/settings'
     | '/library'
-    | '/settings/*'
+    | '/api/chat'
+    | '/settings/models'
+    | '/settings/profile'
+    | '/settings/usage'
     | '/thread/$threadId'
     | '/api/auth/$'
+    | '/api/phr/$'
+    | '/api/chat/$streamId/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/settings'
     | '/library'
-    | '/settings/*'
+    | '/api/chat'
+    | '/settings/models'
+    | '/settings/profile'
+    | '/settings/usage'
     | '/'
     | '/thread/$threadId'
     | '/api/auth/$'
+    | '/api/phr/$'
+    | '/api/chat/$streamId/stream'
   id:
     | '__root__'
     | '/_chat'
     | '/login'
+    | '/settings'
     | '/_chat/library'
-    | '/settings/*'
+    | '/api/chat'
+    | '/settings/models'
+    | '/settings/profile'
+    | '/settings/usage'
     | '/_chat/'
     | '/_chat/thread/$threadId'
     | '/api/auth/$'
+    | '/api/phr/$'
+    | '/api/chat/$streamId/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
   LoginRoute: typeof LoginRoute
-  SettingsChar42Route: typeof SettingsChar42Route
+  SettingsRouteLazyRoute: typeof SettingsRouteLazyRouteWithChildren
+  ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiPhrSplatRoute: typeof ApiPhrSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -129,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_chat/': {
       id: '/_chat/'
       path: '/'
@@ -143,12 +231,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatLibraryRouteImport
       parentRoute: typeof ChatRoute
     }
-    '/settings/*': {
-      id: '/settings/*'
-      path: '/settings/*'
-      fullPath: '/settings/*'
-      preLoaderRoute: typeof SettingsChar42RouteImport
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/settings/models': {
+      id: '/settings/models'
+      path: '/models'
+      fullPath: '/settings/models'
+      preLoaderRoute: typeof SettingsModelsRouteImport
+      parentRoute: typeof SettingsRouteLazyRoute
+    }
+    '/settings/profile': {
+      id: '/settings/profile'
+      path: '/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof SettingsProfileRouteImport
+      parentRoute: typeof SettingsRouteLazyRoute
+    }
+    '/settings/usage': {
+      id: '/settings/usage'
+      path: '/usage'
+      fullPath: '/settings/usage'
+      preLoaderRoute: typeof SettingsUsageLazyRouteImport
+      parentRoute: typeof SettingsRouteLazyRoute
     }
     '/_chat/thread/$threadId': {
       id: '/_chat/thread/$threadId'
@@ -163,6 +272,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/phr/$': {
+      id: '/api/phr/$'
+      path: '/api/phr/$'
+      fullPath: '/api/phr/$'
+      preLoaderRoute: typeof ApiPhrSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat/$streamId/stream': {
+      id: '/api/chat/$streamId/stream'
+      path: '/$streamId/stream'
+      fullPath: '/api/chat/$streamId/stream'
+      preLoaderRoute: typeof ApiChatStreamIdStreamRouteImport
+      parentRoute: typeof ApiChatRoute
     }
   }
 }
@@ -181,11 +304,39 @@ const ChatRouteChildren: ChatRouteChildren = {
 
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
+interface SettingsRouteLazyRouteChildren {
+  SettingsModelsRoute: typeof SettingsModelsRoute
+  SettingsProfileRoute: typeof SettingsProfileRoute
+  SettingsUsageLazyRoute: typeof SettingsUsageLazyRoute
+}
+
+const SettingsRouteLazyRouteChildren: SettingsRouteLazyRouteChildren = {
+  SettingsModelsRoute: SettingsModelsRoute,
+  SettingsProfileRoute: SettingsProfileRoute,
+  SettingsUsageLazyRoute: SettingsUsageLazyRoute,
+}
+
+const SettingsRouteLazyRouteWithChildren =
+  SettingsRouteLazyRoute._addFileChildren(SettingsRouteLazyRouteChildren)
+
+interface ApiChatRouteChildren {
+  ApiChatStreamIdStreamRoute: typeof ApiChatStreamIdStreamRoute
+}
+
+const ApiChatRouteChildren: ApiChatRouteChildren = {
+  ApiChatStreamIdStreamRoute: ApiChatStreamIdStreamRoute,
+}
+
+const ApiChatRouteWithChildren =
+  ApiChatRoute._addFileChildren(ApiChatRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
   LoginRoute: LoginRoute,
-  SettingsChar42Route: SettingsChar42Route,
+  SettingsRouteLazyRoute: SettingsRouteLazyRouteWithChildren,
+  ApiChatRoute: ApiChatRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiPhrSplatRoute: ApiPhrSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -175,10 +175,59 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
+
+  /* Theme-colored scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Theme-colored text selection */
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+  ::-moz-selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+}
+
+/* Shiki dual-theme (light/dark): light colors are inlined by shiki, dark via vars */
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+}
+
+/* Tighten code/mermaid block margins from Streamdown defaults */
+[data-streamdown="code-block"],
+[data-streamdown="mermaid-block"] {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }

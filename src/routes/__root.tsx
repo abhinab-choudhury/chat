@@ -1,3 +1,4 @@
+import { PostHogProvider } from "@posthog/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -6,9 +7,12 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { ConvexProvider } from "convex/react";
 import { ThemeProvider } from "next-themes";
+import { env } from "#/env";
 import { TooltipProvider } from "../components/ui/tooltip";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { convexClient } from "../lib/convex";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
@@ -26,7 +30,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: env.VITE_APP_TITLE ?? ".Chat",
 			},
 		],
 		links: [
@@ -40,34 +44,75 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+	const posthogKey = env.VITE_POSTHOG_KEY;
+	const posthogHost = env.VITE_POSTHOG_HOST ?? "https://us.i.posthog.com";
+
+	const inner = (
+		<ThemeProvider
+			attribute="class"
+			defaultTheme="system"
+			enableSystem
+			disableTransitionOnChange
+		>
+			<TooltipProvider>
+				{convexClient ? (
+					<ConvexProvider client={convexClient}>{children}</ConvexProvider>
+				) : (
+					children
+				)}
+			</TooltipProvider>
+		</ThemeProvider>
+	);
+
+	const content = posthogKey ? (
+		<PostHogProvider
+			apiKey={posthogKey}
+			options={{
+				api_host: posthogHost,
+				defaults: "2026-08-30",
+				capture_exceptions: true,
+			}}
+		>
+			{inner}
+			<TanStackDevtools
+				config={{
+					position: "bottom-right",
+				}}
+				plugins={[
+					{
+						name: "Tanstack Router",
+						render: <TanStackRouterDevtoolsPanel />,
+					},
+					TanStackQueryDevtools,
+				]}
+			/>
+			<Scripts />
+		</PostHogProvider>
+	) : (
+		<>
+			{inner}
+			<TanStackDevtools
+				config={{
+					position: "bottom-right",
+				}}
+				plugins={[
+					{
+						name: "Tanstack Router",
+						render: <TanStackRouterDevtoolsPanel />,
+					},
+					TanStackQueryDevtools,
+				]}
+			/>
+			<Scripts />
+		</>
+	);
+
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
-			<body className="antialiased">
-				<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
-				>
-					<TooltipProvider>{children}</TooltipProvider>
-				</ThemeProvider>
-				<TanStackDevtools
-					config={{
-						position: "bottom-right",
-					}}
-					plugins={[
-						{
-							name: "Tanstack Router",
-							render: <TanStackRouterDevtoolsPanel />,
-						},
-						TanStackQueryDevtools,
-					]}
-				/>
-				<Scripts />
-			</body>
+			<body className="antialiased">{content}</body>
 		</html>
 	);
 }

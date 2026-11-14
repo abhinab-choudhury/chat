@@ -1,4 +1,5 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import {
 	LogOutIcon,
 	MessageSquareIcon,
@@ -22,29 +23,48 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "#/components/ui/sidebar";
+import { useSession } from "#/hooks/auth-hooks";
 import { authClient } from "#/lib/auth-client";
-import { AppIcon } from "./brand-icons";
+import { getCurrentUserId } from "#/lib/user-id";
+import { api } from "../../convex/_generated/api";
 
 export function AppSidebar() {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
 	const navigate = useNavigate();
-	const { data: session } = authClient.useSession();
+	const location = useLocation();
+	const { user, isPending } = useSession();
+
+	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
+	const threads = useQuery(
+		api.threads.listThreads,
+		userId ? { userId } : "skip",
+	);
 
 	const handleSignOut = async () => {
 		await authClient.signOut();
-		void navigate({ to: "/login" });
+		void navigate({ to: "/" });
+	};
+
+	const handleNewChat = () => {
+		void navigate({ to: "/" });
 	};
 
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader className="flex flex-row items-center gap-2 px-2 py-3">
-				{!collapsed ? <div className="text-3xl font-bold mx-1.5">.Chat</div> : null}
+				{!collapsed ? (
+					<div className="text-3xl font-bold mx-1.5">.Chat</div>
+				) : null}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
 					<SidebarGroupContent>
-						<Button className="w-full justify-start" variant="default">
+						<Button
+							className="w-full justify-start"
+							variant="default"
+							onClick={handleNewChat}
+						>
 							<PlusIcon className="mr-2 size-4" />
 							{!collapsed ? "New chat" : null}
 						</Button>
@@ -55,19 +75,49 @@ export function AppSidebar() {
 					<SidebarGroupLabel>Recent</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							<SidebarMenuItem>
-								<SidebarMenuButton tooltip="No conversations yet">
-									<MessageSquareIcon className="size-4" />
-									{!collapsed ? <span>No conversations yet</span> : null}
-								</SidebarMenuButton>
-							</SidebarMenuItem>
+							{(threads ?? [])
+								.filter((t) => !t.archived)
+								.map((thread) => {
+									const isActive =
+										location.pathname === `/thread/${thread._id}`;
+									return (
+										<SidebarMenuItem key={thread._id}>
+											<div className="flex items-center gap-1">
+												<SidebarMenuButton
+													asChild
+													tooltip={thread.title}
+													isActive={isActive}
+													className="flex-1"
+												>
+													<Link
+														to="/thread/$threadId"
+														params={{ threadId: thread._id }}
+													>
+														<MessageSquareIcon className="size-4" />
+														{!collapsed ? (
+															<span className="truncate">{thread.title}</span>
+														) : null}
+													</Link>
+												</SidebarMenuButton>
+											</div>
+										</SidebarMenuItem>
+									);
+								})}
+							{(!threads ||
+								threads.filter((t) => !t.archived).length === 0) && (
+								<SidebarMenuItem>
+									<SidebarMenuButton tooltip="No conversations yet">
+										{!collapsed ? <span>No conversations yet</span> : null}
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>
 			<SidebarFooter>
 				<div className="flex flex-col gap-1 p-2">
-					{session?.user ? (
+					{user ? (
 						<Button
 							asChild
 							variant="ghost"
@@ -92,19 +142,17 @@ export function AppSidebar() {
 							{!collapsed ? <span>Settings</span> : null}
 						</Button>
 					)}
-					{session?.user ? (
+					{user ? (
 						<>
 							<Button
 								variant="ghost"
 								size="sm"
 								className="w-full justify-start"
-								title={session.user.name || session.user.email || "Account"}
+								title={user.name || user.email || "Account"}
 							>
 								<UserIcon className="mr-2 size-4" />
 								{!collapsed ? (
-									<span className="truncate">
-										{session.user.name || session.user.email}
-									</span>
+									<span className="truncate">{user.name || user.email}</span>
 								) : null}
 							</Button>
 							<Button
