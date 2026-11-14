@@ -1,0 +1,143 @@
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+export interface ChatModel {
+	id: string;
+	label: string;
+}
+
+export const DEFAULT_MODELS: ChatModel[] = [
+	{ id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (free tier)" },
+	{ id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (free tier)" },
+	{ id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (free tier)" },
+	{ id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite (free tier)" },
+	{ id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (free tier)" },
+];
+
+export const DEFAULT_SELECTED_MODEL = "gemini-3.5-flash-lite";
+
+export type ReasoningEffort = "off" | "low" | "medium" | "high";
+
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
+
+type McpOverrides = Record<string, Record<string, boolean>>;
+
+export interface ModelStoreState {
+	selectedModel: string;
+	availableModels: ChatModel[];
+	reasoningEffort: ReasoningEffort;
+	enabledTools: string[];
+	toolsEnabled: boolean;
+	defaultMcpOverrides: Record<string, boolean>;
+	mcpOverrides: McpOverrides;
+}
+
+export interface ModelStoreActions {
+	setSelectedModel: (model: string) => void;
+	setAvailableModels: (models: ChatModel[]) => void;
+	setReasoningEffort: (effort: ReasoningEffort) => void;
+	setEnabledTools: (tools: string[]) => void;
+	toggleTool: (tool: string) => void;
+	setToolsEnabled: (enabled: boolean) => void;
+	setDefaultMcpOverride: (server: string, enabled: boolean) => void;
+	setMcpOverride: (threadId: string, server: string, enabled: boolean) => void;
+	getMcpOverrides: (threadId: string) => Record<string, boolean>;
+	getEffectiveMcpOverrides: (threadId?: string) => Record<string, boolean>;
+	clearMcpOverrides: (threadId: string) => void;
+	clearAllMcpOverrides: () => void;
+	reset: () => void;
+}
+
+export type ModelStore = ModelStoreState & ModelStoreActions;
+
+const initialState: ModelStoreState = {
+	selectedModel: DEFAULT_SELECTED_MODEL,
+	availableModels: DEFAULT_MODELS,
+	reasoningEffort: DEFAULT_REASONING_EFFORT,
+	enabledTools: [],
+	toolsEnabled: true,
+	defaultMcpOverrides: {},
+	mcpOverrides: {},
+};
+
+export const useModelStore = create<ModelStore>()(
+	persist(
+		(set, get) => ({
+			...initialState,
+
+			setSelectedModel: (selectedModel) => set({ selectedModel }),
+
+			setAvailableModels: (availableModels) => set({ availableModels }),
+
+			setReasoningEffort: (reasoningEffort) => set({ reasoningEffort }),
+
+			setEnabledTools: (enabledTools) => set({ enabledTools }),
+
+			toggleTool: (tool) =>
+				set((state) => ({
+					enabledTools: state.enabledTools.includes(tool)
+						? state.enabledTools.filter((t) => t !== tool)
+						: [...state.enabledTools, tool],
+				})),
+
+			setToolsEnabled: (toolsEnabled) => set({ toolsEnabled }),
+
+			setDefaultMcpOverride: (server, enabled) =>
+				set((state) => ({
+					defaultMcpOverrides: {
+						...state.defaultMcpOverrides,
+						[server]: enabled,
+					},
+				})),
+
+			setMcpOverride: (threadId, server, enabled) =>
+				set((state) => ({
+					mcpOverrides: {
+						...state.mcpOverrides,
+						[threadId]: {
+							...(state.mcpOverrides[threadId] ?? {}),
+							[server]: enabled,
+						},
+					},
+				})),
+
+			getMcpOverrides: (threadId) => get().mcpOverrides[threadId] ?? {},
+
+			getEffectiveMcpOverrides: (threadId) => {
+				const state = get();
+				if (!threadId) return { ...state.defaultMcpOverrides };
+				return {
+					...state.defaultMcpOverrides,
+					...(state.mcpOverrides[threadId] ?? {}),
+				};
+			},
+
+			clearMcpOverrides: (threadId) =>
+				set((state) => {
+					const mcpOverrides = { ...state.mcpOverrides };
+					delete mcpOverrides[threadId];
+					return { mcpOverrides };
+				}),
+
+			clearAllMcpOverrides: () => set({ mcpOverrides: {} }),
+
+			reset: () => set({ ...initialState }),
+		}),
+		{
+			name: "model-storage",
+			storage: createJSONStorage(() => localStorage),
+			version: 1,
+			partialize: (state) => ({
+				selectedModel: state.selectedModel,
+				reasoningEffort: state.reasoningEffort,
+				enabledTools: state.enabledTools,
+				toolsEnabled: state.toolsEnabled,
+				defaultMcpOverrides: state.defaultMcpOverrides,
+				mcpOverrides: state.mcpOverrides,
+			}),
+		},
+	),
+);
+
+export const modelStore = useModelStore;
+export default useModelStore;

@@ -1,0 +1,179 @@
+import { create } from "zustand";
+
+export type TargetMode = "normal" | "edit" | "retry";
+
+export interface ChatStoreMessage {
+	id?: string;
+	role?: string;
+	content?: string;
+	[key: string]: unknown;
+}
+
+export interface UploadedFile {
+	key: string;
+	fileName: string;
+	fileType: string;
+	fileSize: number;
+	uploadedAt: number;
+}
+
+export interface ChatStoreState {
+	threadId: string | undefined;
+	/** Streams that are pending/queued. */
+	pendingStreams: string[];
+	/** Streams currently attached to the client. */
+	attachedStreamIds: string[];
+	/** Current target mode. */
+	targetMode: TargetMode;
+	/** Current input text. */
+	input: string;
+	/** Whether a request is in flight. */
+	busy: boolean;
+	/** Whether a stream is currently active. */
+	isStreaming: boolean;
+	/** Optional client-held messages (useChat is authoritative). */
+	messages: ChatStoreMessage[];
+	/** Active stream id. */
+	streamId: string | null;
+	/** Active thread title. */
+	threadTitle: string | null;
+	/** Whether the next thread view should auto-send the current input. */
+	pendingAutoSend: boolean;
+	/** Uploaded files attached to the current chat. */
+	uploadedFiles: UploadedFile[];
+	/** Whether files are currently uploading. */
+	uploading: boolean;
+}
+
+export interface ChatStoreActions {
+	setThreadId: (threadId: string | undefined) => void;
+	setPendingStreams: (streams: string[]) => void;
+	addPendingStream: (streamId: string) => void;
+	removePendingStream: (streamId: string) => void;
+	clearPendingStreams: () => void;
+	setUploading: (uploading: boolean) => void;
+	setUploadedFiles: (files: UploadedFile[]) => void;
+	addUploadedFile: (file: UploadedFile) => void;
+	removeUploadedFile: (key: string) => void;
+	clearUploadedFiles: () => void;
+	setAttachedStreamIds: (ids: string[]) => void;
+	attachStream: (streamId: string) => void;
+	attachStreamId: (streamId: string) => void;
+	detachStream: (streamId: string) => void;
+	detachStreamId: (streamId: string) => void;
+	addAttachedStream: (streamId: string) => void;
+	removeAttachedStream: (streamId: string) => void;
+	setTargetMode: (mode: TargetMode) => void;
+	setInput: (input: string) => void;
+	setBusy: (busy: boolean) => void;
+	setIsStreaming: (isStreaming: boolean) => void;
+	setStreamId: (streamId: string | null) => void;
+	setThreadTitle: (title: string | null) => void;
+	setPendingAutoSend: (value: boolean) => void;
+	setMessages: (messages: ChatStoreMessage[]) => void;
+	appendMessage: (message: ChatStoreMessage) => void;
+	clearMessages: () => void;
+	reset: () => void;
+}
+
+export type ChatStore = ChatStoreState & ChatStoreActions;
+
+const initialState: ChatStoreState = {
+	threadId: undefined,
+	pendingStreams: [],
+	attachedStreamIds: [],
+	targetMode: "normal",
+	input: "",
+	busy: false,
+	isStreaming: false,
+	messages: [],
+	streamId: null,
+	threadTitle: null,
+	pendingAutoSend: false,
+	uploading: false,
+	uploadedFiles: [],
+};
+
+export const useChatStore = create<ChatStore>((set) => ({
+	...initialState,
+	setThreadId: (threadId) => set({ threadId }),
+	setPendingStreams: (streams) => set({ pendingStreams: streams }),
+	addPendingStream: (streamId) =>
+		set((state) => ({
+			pendingStreams: state.pendingStreams.includes(streamId)
+				? state.pendingStreams
+				: [...state.pendingStreams, streamId],
+		})),
+	removePendingStream: (streamId) =>
+		set((state) => ({
+			pendingStreams: state.pendingStreams.filter((id) => id !== streamId),
+		})),
+	clearPendingStreams: () => set({ pendingStreams: [] }),
+	setAttachedStreamIds: (ids) => set({ attachedStreamIds: ids }),
+	attachStream: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.includes(streamId)
+				? state.attachedStreamIds
+				: [...state.attachedStreamIds, streamId],
+		})),
+	attachStreamId: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.includes(streamId)
+				? state.attachedStreamIds
+				: [...state.attachedStreamIds, streamId],
+		})),
+	detachStream: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.filter(
+				(id) => id !== streamId,
+			),
+		})),
+	detachStreamId: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.filter(
+				(id) => id !== streamId,
+			),
+		})),
+	addAttachedStream: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.includes(streamId)
+				? state.attachedStreamIds
+				: [...state.attachedStreamIds, streamId],
+		})),
+	removeAttachedStream: (streamId) =>
+		set((state) => ({
+			attachedStreamIds: state.attachedStreamIds.filter(
+				(id) => id !== streamId,
+			),
+		})),
+	setTargetMode: (mode) => set({ targetMode: mode }),
+	setInput: (input) => set({ input }),
+	setBusy: (busy) => set({ busy }),
+	setIsStreaming: (isStreaming) => set({ isStreaming }),
+	setStreamId: (streamId) => set({ streamId }),
+	setThreadTitle: (title) => set({ threadTitle: title }),
+	setPendingAutoSend: (value) => set({ pendingAutoSend: value }),
+	setMessages: (messages) => set({ messages }),
+	appendMessage: (message) =>
+		set((state) => ({ messages: [...state.messages, message] })),
+	clearMessages: () => set({ messages: [] }),
+	reset: () => set({ ...initialState }),
+	setUploading: (uploading) => set({ uploading }),
+	setUploadedFiles: (files) => set({ uploadedFiles: files }),
+	addUploadedFile: (file) =>
+		set((state) => ({
+			uploadedFiles: state.uploadedFiles.some(
+				(uploadedFile) => uploadedFile.key === file.key,
+			)
+				? state.uploadedFiles
+				: [...state.uploadedFiles, file],
+		})),
+	removeUploadedFile: (key) =>
+		set((state) => ({
+			uploadedFiles: state.uploadedFiles.filter((file) => file.key !== key),
+		})),
+	clearUploadedFiles: () => set({ uploadedFiles: [] }),
+}));
+
+export const chatStore = useChatStore;
+export default useChatStore;

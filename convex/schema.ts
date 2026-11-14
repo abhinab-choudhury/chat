@@ -1,14 +1,13 @@
-import { defineSchema, defineTable } from 'convex/server'
-import { v } from 'convex/values'
+import { defineSchema } from "convex/server";
+
+import { messages } from "./schema/messages";
+import { products } from "./schema/products";
+import { projects } from "./schema/projects";
+import { threads } from "./schema/threads";
 
 export default defineSchema({
-  products: defineTable({
-    title: v.string(),
-    imageId: v.string(),
-    price: v.number(),
-  }),
-  todos: defineTable({
-    text: v.string(),
-    completed: v.boolean(),
-  }),
-})
+	products,
+	projects,
+	threads,
+	messages,
+});
