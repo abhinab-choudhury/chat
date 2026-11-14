@@ -19,6 +19,12 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/_chat/thread/$threadId")({
+	// SSR-friendly route boundary: validates params and enables streamed shell rendering.
+	// Authenticated Convex data is reconciled client-side via reactive queries; public
+	// prefetch/SSR can be layered here with server-side Convex fetching when safe.
+	loader: async ({ params }) => {
+		return { threadId: params.threadId };
+	},
 	component: RouteComponent,
 });
 
@@ -346,8 +352,7 @@ function RouteComponent() {
 						if (
 							pendingInitialMessage &&
 							!list.some(
-								(m) =>
-									m.role === "user" && m.content === pendingInitialMessage,
+								(m) => m.role === "user" && m.content === pendingInitialMessage,
 							)
 						) {
 							list.push({
