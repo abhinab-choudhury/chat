@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckIcon } from "lucide-react";
 import * as React from "react";
+import { SettingsLayout } from "#/components/settings/settings-layout";
 import { Button } from "#/components/ui/button";
 import {
 	Card,
@@ -26,8 +27,10 @@ function ModelsSettings() {
 	}, [selectedModel]);
 
 	return (
-		<div className="mx-auto w-full max-w-2xl px-4 py-8">
-			<h1 className="mb-6 text-2xl font-bold tracking-tight">Models</h1>
+		<SettingsLayout
+			title="Models"
+			description="Choose the default model used for new conversations."
+		>
 			<Card>
 				<CardHeader>
 					<CardTitle>Default model</CardTitle>
@@ -60,6 +63,6 @@ function ModelsSettings() {
 					</div>
 				</CardContent>
 			</Card>
-		</div>
+		</SettingsLayout>
 	);
 }
