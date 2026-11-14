@@ -13,9 +13,16 @@ import {
 import * as React from "react";
 import { Streamdown } from "streamdown";
 import { ChatInput } from "#/components/chat/chat-input";
-import { Markdown } from "#/components/markdown";
 import { Button } from "#/components/ui/button";
 import { Message, MessageContent } from "#/components/ui/message";
+import {
+	MessageScroller,
+	MessageScrollerButton,
+	MessageScrollerContent,
+	MessageScrollerItem,
+	MessageScrollerProvider,
+	MessageScrollerViewport,
+} from "#/components/ui/message-scroller";
 import { useSession } from "#/hooks/auth-hooks";
 import { useDiskCachedQuery } from "#/lib/convex-cached-query";
 import {
@@ -164,29 +171,11 @@ function RouteComponent() {
 		}
 	}, []);
 
-	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const sendingRef = React.useRef(false);
-	const userAtBottomRef = React.useRef(true);
-	const [atBottom, setAtBottom] = React.useState(true);
-
-	const handleScroll = React.useCallback(() => {
-		const el = scrollRef.current;
-		if (!el) return;
-		const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-		const bottom = distance < 80;
-		userAtBottomRef.current = bottom;
-		setAtBottom(bottom);
-	}, []);
 
 	React.useEffect(() => {
 		setThreadId(threadId);
 	}, [threadId, setThreadId]);
-
-	const scrollToBottom = React.useCallback((smooth = true) => {
-		const el = scrollRef.current;
-		if (!el) return;
-		el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-	}, []);
 
 	const handleSubmit = React.useCallback(
 		async (override?: string, sendUser: boolean = true) => {
@@ -223,7 +212,8 @@ function RouteComponent() {
 				// message if it hasn't appeared in the Convex query yet.
 				if (!sendUser && pendingInitialMessage) {
 					const hasPending = baseHistory.some(
-						(m: any) => m.role === "user" && m.content === pendingInitialMessage,
+						(m: any) =>
+							m.role === "user" && m.content === pendingInitialMessage,
 					);
 					if (!hasPending) {
 						history = [
@@ -305,8 +295,6 @@ function RouteComponent() {
 				}
 				if (buffer) applyEvent(buffer);
 
-				setStreamingText("");
-				setStreamingReasoning("");
 				if (accumulated.trim() || reasoningAccumulated.trim()) {
 					// Idempotent fallback: server finalizes on completion, client save is safe.
 					await send({
@@ -319,6 +307,8 @@ function RouteComponent() {
 					});
 				}
 				void setThreadStreaming({ threadId, isLive: false });
+				setStreamingText("");
+				setStreamingReasoning("");
 			} catch (e) {
 				console.error(e);
 				setStreamingText("");
@@ -417,8 +407,6 @@ function RouteComponent() {
 				}
 				if (buffer) applyEvent(buffer);
 
-				setStreamingText("");
-				setStreamingReasoning("");
 				if (accumulated.trim() || reasoningAccumulated.trim()) {
 					await send({
 						clientUuid: assistantClientUuid,
@@ -430,6 +418,8 @@ function RouteComponent() {
 					});
 				}
 				void setThreadStreaming({ threadId, isLive: false });
+				setStreamingText("");
+				setStreamingReasoning("");
 			} catch (e) {
 				console.error(e);
 				void setThreadStreaming({ threadId, isLive: false });
@@ -445,24 +435,7 @@ function RouteComponent() {
 		setThreadStreaming,
 	]);
 
-	// Auto-scroll while streaming if user is at bottom.
-	React.useEffect(() => {
-		if (streamingText && userAtBottomRef.current) {
-			scrollToBottom(false);
-		}
-	}, [streamingText, scrollToBottom]);
-
-	// Scroll to bottom when new messages arrive if at bottom.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: trigger on messages change
-	React.useEffect(() => {
-		if (userAtBottomRef.current) {
-			scrollToBottom(false);
-		}
-	}, [messages, scrollToBottom]);
-
-	React.useEffect(() => {
-		handleScroll();
-	}, [handleScroll]);
+	// Scrolling/follow behavior is handled by MessageScroller (autoScroll + defaultScrollPosition).
 
 	if (isPending || currentUserId === null || thread === undefined) {
 		return (
@@ -479,266 +452,287 @@ function RouteComponent() {
 		);
 	}
 
+	const displayMessages = (() => {
+		const source = (messages ?? cachedMessages ?? []) as Array<{
+			_id: string;
+			role: string;
+			content: string;
+			reasoning?: string;
+		}>;
+		const list = [...source] as Array<{
+			_id: string;
+			role: string;
+			content: string;
+			reasoning?: string;
+			_optimistic?: boolean;
+		}>;
+		if (
+			pendingInitialMessage &&
+			!list.some(
+				(m) => m.role === "user" && m.content === pendingInitialMessage,
+			)
+		) {
+			list.push({
+				_id: "__optimistic_user__",
+				role: "user",
+				content: pendingInitialMessage,
+				_optimistic: true,
+			});
+		}
+		return list;
+	})();
+
+	const isStreaming = Boolean(
+		(busy || pendingAutoSend) && (streamingReasoning || streamingText),
+	);
+	const isThinkingOnly = Boolean(
+		(busy || pendingAutoSend) && !streamingText && !streamingReasoning,
+	);
+
 	return (
-		<div className="relative flex flex-1 flex-col">
-			<div
-				ref={scrollRef}
-				onScroll={handleScroll}
-				className="flex-1 overflow-y-auto px-4 py-6"
-			>
-				<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-					{(() => {
-						const source = (messages ?? cachedMessages ?? []) as Array<{
-							_id: string;
-							role: string;
-							content: string;
-							reasoning?: string;
-						}>;
-						const list = [...source] as Array<{
-							_id: string;
-							role: string;
-							content: string;
-							reasoning?: string;
-							_optimistic?: boolean;
-						}>;
-						if (
-							pendingInitialMessage &&
-							!list.some(
-								(m) => m.role === "user" && m.content === pendingInitialMessage,
-							)
-						) {
-							list.push({
-								_id: "__optimistic_user__",
-								role: "user",
-								content: pendingInitialMessage,
-								_optimistic: true,
-							});
-						}
-						return list;
-					})().map(
-						(m: {
-							_id: string;
-							role: string;
-							content: string;
-							reasoning?: string;
-							_optimistic?: boolean;
-						}) => {
-							const isUser = m.role === "user";
-							const isAssistant = m.role === "assistant";
-							const isEditing = editingId === m._id;
-							const isThinkingOpen = Boolean(openThinkingIds[m._id]);
-							const isCopied = copiedId === m._id;
-							return (
-								<Message
-									key={m._id}
-									align={isUser ? "end" : "start"}
-									className={
-										isUser
-											? "w-fit max-w-[75%] self-end flex-col items-end gap-1"
-											: "w-full self-start"
-									}
-								>
-									{isUser && isEditing ? (
-										<div className="flex w-full flex-col gap-2">
-											<textarea
-												value={editingText}
-												onChange={(e) => setEditingText(e.target.value)}
-												className="min-h-10 w-full resize-none rounded-2xl border border-border bg-card px-3 py-2 text-sm outline-none"
-											/>
-											<div className="flex justify-end gap-2">
-												<Button
-													type="button"
-													size="xs"
-													variant="ghost"
-													onClick={() => {
-														setEditingId(null);
-														setEditingText("");
-													}}
-												>
-													Cancel
-												</Button>
-												<Button
-													type="button"
-													size="xs"
-													onClick={async () => {
-														if (!editingText.trim()) return;
-														await updateMessage({
-															messageId: m._id as Id<"messages">,
-															content: editingText.trim(),
-														});
-														setEditingId(null);
-														setEditingText("");
-													}}
-												>
-													Save
-												</Button>
-											</div>
-										</div>
-									) : (
-										<>
-											<MessageContent
-												className={
-													isUser
-														? "select-text rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground whitespace-pre-wrap"
-														: "select-text w-full text-sm"
-												}
-											>
-												{isAssistant && m.reasoning ? (
-													<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
-														<button
-															type="button"
-															className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
-															onClick={() => toggleThinking(m._id)}
-															aria-expanded={isThinkingOpen}
-														>
-															{isThinkingOpen ? (
-																<ChevronDownIcon className="size-3.5" />
-															) : (
-																<ChevronRightIcon className="size-3.5" />
-															)}
-															<span>Thinking</span>
-														</button>
-														{isThinkingOpen ? (
-															<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-																{m.reasoning}
-															</div>
-														) : null}
-													</div>
-												) : null}
-												{isAssistant ? (
-													<Markdown
-														content={m.content}
-														className="max-w-none w-full"
-													/>
-												) : (
-													m.content
-												)}
-											</MessageContent>
-											<div
+		<div className="relative flex-1 min-h-0">
+			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
+				<MessageScroller className="absolute inset-0">
+					<MessageScrollerViewport className="px-4 py-6 pb-36">
+						<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
+							{displayMessages.map(
+								(m: {
+									_id: string;
+									role: string;
+									content: string;
+									reasoning?: string;
+									_optimistic?: boolean;
+								}) => {
+									const isUser = m.role === "user";
+									const isAssistant = m.role === "assistant";
+									const isEditing = editingId === m._id;
+									const isThinkingOpen = Boolean(openThinkingIds[m._id]);
+									const isCopied = copiedId === m._id;
+									return (
+										<MessageScrollerItem
+											key={m._id}
+											messageId={m._id}
+											scrollAnchor={isUser}
+											className={cn(
+												"flex w-full",
+												isUser ? "justify-end" : "justify-start",
+											)}
+										>
+											<Message
+												align={isUser ? "end" : "start"}
 												className={cn(
-													"mt-1 flex items-center gap-1 transition-all duration-200",
 													isUser
-														? "justify-end opacity-0 group-hover/message:opacity-100 focus-within:opacity-100"
-														: "justify-start",
+														? "w-fit max-w-[85%] flex-col items-end gap-1 sm:max-w-[75%]"
+														: "w-full max-w-none flex-col items-start gap-1",
 												)}
 											>
-												{isUser && !m._optimistic ? (
-													<>
-														<Button
-															type="button"
-															size="icon-xs"
-															variant="ghost"
-															aria-label="Retry"
-															className="text-muted-foreground hover:text-foreground"
-															onClick={() => void handleSubmit(m.content)}
-														>
-															<RotateCcwIcon className="size-3" />
-														</Button>
-														<Button
-															type="button"
-															size="icon-xs"
-															variant="ghost"
-															aria-label="Edit"
-															className="text-muted-foreground hover:text-foreground"
-															onClick={() => {
-																setEditingId(m._id);
-																setEditingText(m.content);
-															}}
-														>
-															<PencilIcon className="size-3" />
-														</Button>
-													</>
-												) : null}
-												{(m.content || "").trim() ? (
-													<Button
-														type="button"
-														size="icon-xs"
-														variant="ghost"
-														aria-label={isCopied ? "Copied" : "Copy"}
-														className={cn(
-															"text-muted-foreground transition-all duration-200 hover:text-foreground",
-															isCopied && "scale-110 text-foreground",
-														)}
-														onClick={() => void copyText(m._id, m.content)}
-													>
-														{isCopied ? (
-															<CheckIcon className="size-3" />
-														) : (
-															<CopyIcon className="size-3" />
-														)}
-													</Button>
-												) : null}
-											</div>
-										</>
-									)}
-								</Message>
-							);
-						},
-					)}
-					{(busy || pendingAutoSend) &&
-						(streamingReasoning || streamingText) && (
-							<Message align="start" className="w-full self-start">
-								<MessageContent className="select-text w-full text-sm">
-									{streamingReasoning ? (
-										<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
-											<button
-												type="button"
-												className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
-												onClick={() => setThinkingOpen((v) => !v)}
-												aria-expanded={thinkingOpen}
-											>
-												{thinkingOpen ? (
-													<ChevronDownIcon className="size-3.5" />
+												{isUser && isEditing ? (
+													<div className="flex w-full flex-col gap-2">
+														<textarea
+															value={editingText}
+															onChange={(e) => setEditingText(e.target.value)}
+															className="min-h-10 w-full resize-none rounded-2xl border border-border bg-card px-3 py-2 text-sm outline-none"
+														/>
+														<div className="flex justify-end gap-2">
+															<Button
+																type="button"
+																size="xs"
+																variant="ghost"
+																onClick={() => {
+																	setEditingId(null);
+																	setEditingText("");
+																}}
+															>
+																Cancel
+															</Button>
+															<Button
+																type="button"
+																size="xs"
+																onClick={async () => {
+																	if (!editingText.trim()) return;
+																	await updateMessage({
+																		messageId: m._id as Id<"messages">,
+																		content: editingText.trim(),
+																	});
+																	setEditingId(null);
+																	setEditingText("");
+																}}
+															>
+																Save
+															</Button>
+														</div>
+													</div>
 												) : (
-													<ChevronRightIcon className="size-3.5" />
+													<>
+														<MessageContent
+															className={
+																isUser
+																	? "select-text rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground whitespace-pre-wrap"
+																	: "select-text w-full text-sm"
+															}
+														>
+															{isAssistant && m.reasoning ? (
+																<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+																	<button
+																		type="button"
+																		className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+																		onClick={() => toggleThinking(m._id)}
+																		aria-expanded={isThinkingOpen}
+																	>
+																		{isThinkingOpen ? (
+																			<ChevronDownIcon className="size-3.5" />
+																		) : (
+																			<ChevronRightIcon className="size-3.5" />
+																		)}
+																		<span>Thinking</span>
+																	</button>
+																	{isThinkingOpen ? (
+																		<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+																			{m.reasoning}
+																		</div>
+																	) : null}
+																</div>
+															) : null}
+															{isAssistant ? (
+																<Streamdown
+																	plugins={{ code, math }}
+																	mode="static"
+																	codeBlockMaxHeight={0}
+																	className="max-w-none w-full"
+																>
+																	{m.content}
+																</Streamdown>
+															) : (
+																m.content
+															)}
+														</MessageContent>
+														<div
+															className={cn(
+																"mt-1 flex items-center gap-1 transition-all duration-200",
+																isUser
+																	? "justify-end opacity-0 group-hover/message:opacity-100 focus-within:opacity-100"
+																	: "justify-start",
+															)}
+														>
+															{isUser && !m._optimistic ? (
+																<>
+																	<Button
+																		type="button"
+																		size="icon-xs"
+																		variant="ghost"
+																		aria-label="Retry"
+																		className="text-muted-foreground hover:text-foreground"
+																		onClick={() => void handleSubmit(m.content)}
+																	>
+																		<RotateCcwIcon className="size-3" />
+																	</Button>
+																	<Button
+																		type="button"
+																		size="icon-xs"
+																		variant="ghost"
+																		aria-label="Edit"
+																		className="text-muted-foreground hover:text-foreground"
+																		onClick={() => {
+																			setEditingId(m._id);
+																			setEditingText(m.content);
+																		}}
+																	>
+																		<PencilIcon className="size-3" />
+																	</Button>
+																</>
+															) : null}
+															{(m.content || "").trim() ? (
+																<Button
+																	type="button"
+																	size="icon-xs"
+																	variant="ghost"
+																	aria-label={isCopied ? "Copied" : "Copy"}
+																	className={cn(
+																		"text-muted-foreground transition-all duration-200 hover:text-foreground",
+																		isCopied && "scale-110 text-foreground",
+																	)}
+																	onClick={() =>
+																		void copyText(m._id, m.content)
+																	}
+																>
+																	{isCopied ? (
+																		<CheckIcon className="size-3" />
+																	) : (
+																		<CopyIcon className="size-3" />
+																	)}
+																</Button>
+															) : null}
+														</div>
+													</>
 												)}
-												<span>Thinking</span>
-												{!streamingText ? (
-													<span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70" />
-												) : null}
-											</button>
-											{thinkingOpen ? (
-												<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-													{streamingReasoning}
+											</Message>
+										</MessageScrollerItem>
+									);
+								},
+							)}
+							{isStreaming ? (
+								<MessageScrollerItem
+									messageId="__streaming__"
+									className="flex w-full justify-start"
+								>
+									<Message
+										align="start"
+										className="w-full max-w-none flex-col items-start gap-1"
+									>
+										<MessageContent className="select-text w-full text-sm">
+											{streamingReasoning ? (
+												<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+													<button
+														type="button"
+														className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+														onClick={() => setThinkingOpen((v) => !v)}
+														aria-expanded={thinkingOpen}
+													>
+														{thinkingOpen ? (
+															<ChevronDownIcon className="size-3.5" />
+														) : (
+															<ChevronRightIcon className="size-3.5" />
+														)}
+														<span>Thinking</span>
+														{!streamingText ? (
+															<span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70" />
+														) : null}
+													</button>
+													{thinkingOpen ? (
+														<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+															{streamingReasoning}
+														</div>
+													) : null}
 												</div>
 											) : null}
-										</div>
-									) : null}
-									{streamingText ? (
-										<Streamdown
-											plugins={{ code, math }}
-											mode="static"
-											className="max-w-none w-full"
-										>
-											{streamingText}
-										</Streamdown>
-									) : null}
-								</MessageContent>
-							</Message>
-						)}
-					{(busy || pendingAutoSend) &&
-						!streamingText &&
-						!streamingReasoning && (
-							<div className="self-start text-xs text-muted-foreground">
-								Thinking…
-							</div>
-						)}
-				</div>
-			</div>
-			{!atBottom && (
-				<div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex justify-center">
-					<Button
-						type="button"
-						size="xs"
-						variant="secondary"
-						className="pointer-events-auto text-xs"
-						onClick={() => scrollToBottom(true)}
-					>
-						Scroll to bottom
-					</Button>
-				</div>
-			)}
-			<div className="sticky bottom-0 z-20 w-full px-4 pb-4">
+											{streamingText ? (
+												<Streamdown
+													plugins={{ code, math }}
+													mode="static"
+													codeBlockMaxHeight={0}
+													className="max-w-none w-full"
+												>
+													{streamingText}
+												</Streamdown>
+											) : null}
+										</MessageContent>
+									</Message>
+								</MessageScrollerItem>
+							) : null}
+							{isThinkingOnly ? (
+								<MessageScrollerItem
+									messageId="__thinking__"
+									className="flex w-full justify-start"
+								>
+									<div className="text-xs text-muted-foreground">Thinking…</div>
+								</MessageScrollerItem>
+							) : null}
+						</MessageScrollerContent>
+					</MessageScrollerViewport>
+					<MessageScrollerButton />
+				</MessageScroller>
+			</MessageScrollerProvider>
+			<div className="absolute -bottom-5 left-0 right-0 w-full px-4 py-4 bg-transparent z-30">
 				<div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
 					{isOwner ? (
 						<ChatInput

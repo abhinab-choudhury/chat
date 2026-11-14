@@ -160,7 +160,11 @@ export const Route = createFileRoute("/api/chat")({
 						new ReadableStream<string>({
 							async start(controller) {
 								const enqueue = (event: Record<string, unknown>) => {
-									controller.enqueue(`${JSON.stringify(event)}\n`);
+									try {
+										controller.enqueue(`${JSON.stringify(event)}\n`);
+									} catch {
+										// Client may have disconnected; keep consuming the model stream.
+									}
 								};
 								try {
 									for await (const part of result.fullStream) {
@@ -193,7 +197,11 @@ export const Route = createFileRoute("/api/chat")({
 									try {
 										await finalize();
 									} finally {
-										controller.close();
+										try {
+											controller.close();
+										} catch {
+											// ignore close after disconnect
+										}
 									}
 								}
 							},
@@ -205,22 +213,38 @@ export const Route = createFileRoute("/api/chat")({
 						"X-Accel-Buffering": "no",
 					};
 
+					// Always run the producer to completion so server-side persistence/finalization
+					// happens even if the client disconnects (tab close/navigation).
+					const producer = makeEventStream();
+					const [clientStream, backgroundStream] = producer.tee();
+					void (async () => {
+						try {
+							const reader = backgroundStream.getReader();
+							while (true) {
+								const { done } = await reader.read();
+								if (done) break;
+							}
+						} catch (error) {
+							console.error("[chat] background stream drain failed", error);
+						}
+					})();
+
 					const ctx = getResumableStreamContext();
 					if (ctx && streamId) {
 						const resumable = await ctx.resumableStream(
 							streamId,
-							makeEventStream,
+							() => clientStream,
 						);
 						if (resumable) {
 							return new Response(resumable, { headers });
 						}
 					}
 
-					// No resumable context: stream directly but still finalize server-side.
-					return new Response(
-						makeEventStream().pipeThrough(new TextEncoderStream()),
-						{ headers },
-					);
+					// No resumable context: stream directly to this client, but producer is
+					// independently drained above so generation/finalization continues on disconnect.
+					return new Response(clientStream.pipeThrough(new TextEncoderStream()), {
+						headers,
+					});
 				} catch (error) {
 					if (threadMarkedLive && !finalized) {
 						const convex = getConvexServerClient();

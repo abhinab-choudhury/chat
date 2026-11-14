@@ -76,7 +76,7 @@ export function ChatInput({
 	};
 
 	return (
-		<div className="w-full rounded-2xl border border-border bg-card p-2 shadow-sm">
+		<div className="w-full rounded-b-none rounded-2xl border border-border/50 bg-card/60 p-2 shadow-sm backdrop-blur-md">
 			<textarea
 				ref={textareaRef}
 				value={value}
@@ -107,7 +107,7 @@ export function ChatInput({
 						<SelectTrigger className="h-9 w-45 rounded-xl text-xs font-medium">
 							<SelectValue placeholder="Model" />
 						</SelectTrigger>
-						<SelectContent className="mb-15">
+						<SelectContent className="mb-10">
 							{models.map((m) => (
 								<SelectItem key={m.id} value={m.id}>
 									{m.label}

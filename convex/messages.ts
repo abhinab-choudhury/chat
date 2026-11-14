@@ -75,6 +75,68 @@ export const updateMessage = mutation({
 	},
 });
 
+// Aggregate per-user usage statistics for the settings page.
+export const getUserUsage = query({
+	args: { userId: v.string() },
+	handler: async (ctx, args) => {
+		const threads = await ctx.db
+			.query("threads")
+			.withIndex("by_user", (q) => q.eq("userId", args.userId))
+			.collect();
+
+		let totalMessages = 0;
+		let userMessages = 0;
+		let assistantMessages = 0;
+
+		const days = 7;
+		const now = Date.now();
+		const msPerDay = 24 * 60 * 60 * 1000;
+		// Bucket start (midnight-ish) for each of the last `days` days.
+		const bucketStarts: number[] = [];
+		for (let i = days - 1; i >= 0; i--) {
+			const d = new Date(now - i * msPerDay);
+			d.setHours(0, 0, 0, 0);
+			bucketStarts.push(d.getTime());
+		}
+		const counts = new Array(days).fill(0);
+
+		for (const thread of threads) {
+			const messages = await ctx.db
+				.query("messages")
+				.withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+				.collect();
+			for (const m of messages) {
+				totalMessages += 1;
+				if (m.role === "user") userMessages += 1;
+				else if (m.role === "assistant") assistantMessages += 1;
+
+				const dayIndex = bucketStarts.findIndex(
+					(start, idx) =>
+						m.createdAt >= start &&
+						(idx === days - 1 || m.createdAt < bucketStarts[idx + 1]),
+				);
+				if (dayIndex !== -1) counts[dayIndex] += 1;
+			}
+		}
+
+		const daily = bucketStarts.map((start, idx) => {
+			const d = new Date(start);
+			return {
+				name: d.toLocaleDateString("en-US", { weekday: "short" }),
+				messages: counts[idx],
+			};
+		});
+
+		return {
+			totalThreads: threads.length,
+			totalMessages,
+			userMessages,
+			assistantMessages,
+			daily,
+		};
+	},
+});
+
 // Append to an in-flight assistant message (streaming). Uses clientUuid to find it.
 export const appendMessage = mutation({
 	args: {

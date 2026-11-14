@@ -2,6 +2,13 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import * as React from "react";
 import { Message, MessageContent } from "#/components/ui/message";
+import {
+	MessageScroller,
+	MessageScrollerContent,
+	MessageScrollerItem,
+	MessageScrollerProvider,
+	MessageScrollerViewport,
+} from "#/components/ui/message-scroller";
 import { useSession } from "#/hooks/auth-hooks";
 import { generateTitle } from "#/lib/ai.functions";
 import {
@@ -19,7 +26,7 @@ import {
 } from "./suggested-questions";
 
 const AUTH_QUESTIONS = [
-	{ id: "a1", label: "Summarize my recent conversations" },
+	{ id: "a1", label: "Summarize the paper \"Attentation is All you Need\" by OpenAI" },
 	{ id: "a2", label: "Draft a reply to a customer" },
 	{ id: "a3", label: "Brainstorm ideas for a new feature" },
 	{ id: "a4", label: "Explain a code snippet" },
@@ -161,23 +168,36 @@ export function ChatHome() {
 
 	if (optimisticMessage) {
 		return (
-			<div className="relative flex flex-1 flex-col">
-				<div className="flex-1 overflow-y-auto px-4 py-6">
-					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-						<Message
-							align="end"
-							className="w-fit max-w-[75%] self-end flex-col items-end gap-1"
-						>
-							<MessageContent className="select-text w-full whitespace-pre-wrap rounded-2xl bg-primary px-4 py-2 text-sm text-primary-foreground">
-								{optimisticMessage}
-							</MessageContent>
-						</Message>
-						<div className="self-start text-xs text-muted-foreground">
-							Thinking…
-						</div>
-					</div>
-				</div>
-				<div className="sticky bottom-0 z-20 w-full px-4 pb-4">
+			<div className="relative flex-1 min-h-0">
+				<MessageScrollerProvider autoScroll defaultScrollPosition="end">
+					<MessageScroller className="absolute inset-0">
+						<MessageScrollerViewport className="px-4 py-6 pb-24">
+							<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
+								<MessageScrollerItem
+									messageId="__optimistic_home_user__"
+									scrollAnchor
+									className="flex w-full justify-end"
+								>
+									<Message
+										align="end"
+										className="w-fit max-w-[85%] flex-col items-end gap-1 sm:max-w-[75%]"
+									>
+										<MessageContent className="select-text w-full whitespace-pre-wrap rounded-2xl bg-primary px-4 py-2 text-sm text-primary-foreground">
+											{optimisticMessage}
+										</MessageContent>
+									</Message>
+								</MessageScrollerItem>
+								<MessageScrollerItem
+									messageId="__optimistic_home_thinking__"
+									className="flex w-full justify-start"
+								>
+									<div className="text-xs text-muted-foreground">Thinking…</div>
+								</MessageScrollerItem>
+							</MessageScrollerContent>
+						</MessageScrollerViewport>
+					</MessageScroller>
+				</MessageScrollerProvider>
+				<div className="absolute bottom-0 left-0 right-0 w-full px-4 py-4 bg-background/60 backdrop-blur-md z-30">
 					<div className="mx-auto w-full max-w-3xl">
 						<ChatInput
 							value=""
@@ -231,7 +251,7 @@ export function ChatHome() {
 			</div>
 
 			<div className="sticky bottom-0 z-20 mt-auto w-full px-4">
-				<div className="mx-auto w-full max-w-3xl">
+				<div className="mx-auto w-full max-w-3xl bg-transparent">
 					<ChatInput
 						value={message}
 						onChange={setMessage}
