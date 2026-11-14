@@ -24,6 +24,7 @@ import {
 	MessageScrollerViewport,
 } from "#/components/ui/message-scroller";
 import { useSession } from "#/hooks/auth-hooks";
+import { RouteErrorComponent } from "#/components/route-error";
 import { useDiskCachedQuery } from "#/lib/convex-cached-query";
 import {
 	readCachedMessages,
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/_chat/thread/$threadId")({
 		return { threadId: params.threadId };
 	},
 	component: RouteComponent,
+	errorComponent: RouteErrorComponent,
 });
 
 function RouteComponent() {
@@ -437,10 +439,33 @@ function RouteComponent() {
 
 	// Scrolling/follow behavior is handled by MessageScroller (autoScroll + defaultScrollPosition).
 
-	if (isPending || currentUserId === null || thread === undefined) {
+	if (isPending) {
 		return (
 			<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
 				Loading…
+			</div>
+		);
+	}
+
+	if (currentUserId === null) {
+		return (
+			<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+				Please sign in to view this thread.
+			</div>
+		);
+	}
+
+	if (thread === undefined) {
+		return (
+			<div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+				<p>Unable to load this thread.</p>
+				<button
+					type="button"
+					className="rounded-md border px-3 py-1 text-xs"
+					onClick={() => window.location.reload()}
+				>
+					Retry
+				</button>
 			</div>
 		);
 	}

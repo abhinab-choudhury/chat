@@ -32,6 +32,19 @@ function UsageSettings() {
 		user?.id ? { userId: user.id } : "skip",
 	);
 
+	if (!isPending && !user) {
+		return (
+			<SettingsLayout
+				title="Usage"
+				description="Track your conversations and message activity."
+			>
+				<p className="text-sm text-muted-foreground">
+					Sign in to view your usage.
+				</p>
+			</SettingsLayout>
+		);
+	}
+
 	const daily = usage?.daily ?? [];
 	const totalMessages = usage?.totalMessages ?? 0;
 	const totalThreads = usage?.totalThreads ?? 0;
@@ -78,7 +91,7 @@ function UsageSettings() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="h-72">
-					{isPending || usage === undefined ? (
+					{isPending || (user && usage === undefined) ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
 							Loading usage…
 						</div>

@@ -18,6 +18,7 @@ import { SettingsLayout } from "#/components/settings/settings-layout";
 import { Button } from "#/components/ui/button";
 import { Skeleton } from "#/components/ui/skeleton";
 import { useSession } from "#/hooks/auth-hooks";
+import { RouteErrorComponent } from "#/components/route-error";
 import { cn } from "#/lib/utils";
 
 const settingsNavItems = [
@@ -30,6 +31,7 @@ const settingsNavItems = [
 
 export const Route = createLazyFileRoute("/settings")({
 	component: SettingsPage,
+	errorComponent: RouteErrorComponent,
 });
 
 function Inner() {

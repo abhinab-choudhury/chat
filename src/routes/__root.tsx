@@ -11,6 +11,7 @@ import { ConvexProvider } from "convex/react";
 import { ThemeProvider } from "next-themes";
 import { env } from "#/env";
 import { TooltipProvider } from "../components/ui/tooltip";
+import { RouteErrorComponent } from "#/components/route-error";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { convexClient } from "../lib/convex";
 import appCss from "../styles.css?url";
@@ -20,6 +21,8 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	errorComponent: RouteErrorComponent,
+	notFoundComponent: RouteErrorComponent,
 	head: () => ({
 		meta: [
 			{

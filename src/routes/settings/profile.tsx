@@ -172,6 +172,19 @@ function UserAccountSettings() {
 		);
 	}
 
+	if (!user) {
+		return (
+			<SettingsLayout
+				title="User Account"
+				description="Manage your account settings and active sessions."
+			>
+				<p className="text-sm text-muted-foreground">
+					Sign in to manage your profile.
+				</p>
+			</SettingsLayout>
+		);
+	}
+
 	const currentSessionId = sessionData?.session?.id;
 
 	return (
