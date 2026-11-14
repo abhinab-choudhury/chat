@@ -181,6 +181,16 @@ function RouteComponent() {
 		setThreadId(threadId);
 	}, [threadId, setThreadId]);
 
+	// Reset per-thread streaming bookkeeping when navigating between threads so a
+	// previous thread's in-flight stream doesn't leak into this one's UI.
+	React.useEffect(() => {
+		autoSentRef.current = false;
+		resumedRef.current = false;
+		setStreamingText("");
+		setStreamingReasoning("");
+		setThinkingOpen(false);
+	}, [threadId]);
+
 	const handleSubmit = React.useCallback(
 		async (override?: string, sendUser: boolean = true) => {
 			const trimmed = (override ?? input).trim();
