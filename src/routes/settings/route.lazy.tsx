@@ -67,6 +67,13 @@ function Inner() {
 function SettingsPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
+	const { user, isPending } = useSession();
+
+	React.useEffect(() => {
+		if (!isPending && !user) {
+			void navigate({ to: "/login" });
+		}
+	}, [isPending, user, navigate]);
 
 	React.useEffect(() => {
 		if (

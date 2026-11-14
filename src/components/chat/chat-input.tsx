@@ -104,7 +104,7 @@ export function ChatInput({
 						onValueChange={handleModelChange}
 						disabled={disabled}
 					>
-						<SelectTrigger className="h-9 w-45 rounded-xl text-xs font-medium">
+						<SelectTrigger className="h-9 w-32 sm:w-45 rounded-xl text-xs font-medium">
 							<SelectValue placeholder="Model" />
 						</SelectTrigger>
 						<SelectContent className="mb-10">

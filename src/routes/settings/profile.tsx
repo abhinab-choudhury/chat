@@ -40,7 +40,7 @@ export const Route = createFileRoute("/settings/profile")({
 });
 
 function UserAccountSettings() {
-	const { user, isPending: sessionLoading } = useSession();
+	const { user, isPending: sessionLoading, refetch: refetchSession } = useSession();
 	const { data: sessionData } = authClient.useSession();
 	const { data: sessions = [], isPending: sessionsLoading } = useListSessions();
 	const updateUser = useUpdateUser();
@@ -50,6 +50,14 @@ function UserAccountSettings() {
 
 	const [isEditingName, setIsEditingName] = React.useState(false);
 	const [nameValue, setNameValue] = React.useState("");
+	const [signingOut, setSigningOut] = React.useState(false);
+	const busyRef = React.useRef(false);
+
+	const isAuthBusy =
+		signingOut ||
+		updateUser.isPending ||
+		revokeSession.isPending ||
+		revokeOtherSessions.isPending;
 
 	const displayName = React.useMemo(() => {
 		if (user?.name?.trim()) return user.name;
@@ -57,15 +65,18 @@ function UserAccountSettings() {
 	}, [user?.name, user?.email]);
 
 	const handleEditName = React.useCallback(() => {
+		if (busyRef.current || isAuthBusy) return;
 		setNameValue(displayName || "");
 		setIsEditingName(true);
-	}, [displayName]);
+	}, [displayName, isAuthBusy]);
 
 	const handleSaveName = React.useCallback(async () => {
+		if (busyRef.current || isAuthBusy) return;
 		if (!nameValue.trim()) {
 			toast.error("Name cannot be empty");
 			return;
 		}
+		busyRef.current = true;
 		try {
 			await updateUser.mutateAsync({ name: nameValue.trim() });
 			setIsEditingName(false);
@@ -73,47 +84,65 @@ function UserAccountSettings() {
 		} catch (error) {
 			toast.error("Failed to update name");
 			console.error("Error updating name:", error);
+		} finally {
+			busyRef.current = false;
 		}
-	}, [nameValue, updateUser]);
+	}, [nameValue, updateUser, isAuthBusy]);
 
 	const handleCancelEdit = React.useCallback(() => {
+		if (busyRef.current || isAuthBusy) return;
 		setIsEditingName(false);
 		setNameValue("");
-	}, []);
+	}, [isAuthBusy]);
 
 	const handleRevokeSession = React.useCallback(
 		async (sessionId: string) => {
+			if (busyRef.current || isAuthBusy) return;
+			busyRef.current = true;
 			try {
 				await revokeSession.mutateAsync({ sessionId });
 				toast.success("Session revoked successfully");
 			} catch (error) {
 				toast.error("Failed to revoke session");
 				console.error("Error revoking session:", error);
+			} finally {
+				busyRef.current = false;
 			}
 		},
-		[revokeSession],
+		[revokeSession, isAuthBusy],
 	);
 
 	const handleSignOut = React.useCallback(async () => {
+		if (busyRef.current || isAuthBusy) return;
+		busyRef.current = true;
+		setSigningOut(true);
 		try {
 			await authClient.signOut();
+			await refetchSession();
 			toast.success("Signed out successfully");
-			void router.navigate({ to: "/" });
+			void router.navigate({ to: "/login" });
 		} catch (error) {
 			toast.error("Failed to sign out");
 			console.error("Error signing out:", error);
+		} finally {
+			setSigningOut(false);
+			busyRef.current = false;
 		}
-	}, [router]);
+	}, [router, isAuthBusy]);
 
 	const handleRevokeOtherSessions = React.useCallback(async () => {
+		if (busyRef.current || isAuthBusy) return;
+		busyRef.current = true;
 		try {
 			await revokeOtherSessions.mutateAsync({});
 			toast.success("All other sessions revoked successfully");
 		} catch (error) {
 			toast.error("Failed to revoke other sessions");
 			console.error("Error revoking other sessions:", error);
+		} finally {
+			busyRef.current = false;
 		}
-	}, [revokeOtherSessions]);
+	}, [revokeOtherSessions, isAuthBusy]);
 
 	const getDeviceInfo = React.useCallback(
 		(userAgent: string | null | undefined) => {
@@ -224,11 +253,12 @@ function UserAccountSettings() {
 											onChange={(e) => setNameValue(e.target.value)}
 											placeholder="Enter your name"
 											className="flex-1"
+											disabled={isAuthBusy}
 										/>
 										<div className="flex gap-2">
 											<Button
 												onClick={handleSaveName}
-												disabled={updateUser.isPending}
+												disabled={isAuthBusy}
 												size="sm"
 												className="flex-1 sm:flex-none"
 											>
@@ -240,6 +270,7 @@ function UserAccountSettings() {
 												variant="outline"
 												size="sm"
 												className="flex-1 sm:flex-none"
+												disabled={isAuthBusy}
 											>
 												<X className="h-4 w-4" />
 												Cancel
@@ -256,7 +287,12 @@ function UserAccountSettings() {
 										>
 											{displayName || "No name"}
 										</div>
-										<Button onClick={handleEditName} variant="ghost" size="sm">
+										<Button
+											onClick={handleEditName}
+											variant="ghost"
+											size="sm"
+											disabled={isAuthBusy}
+										>
 											<Edit className="h-4 w-4" />
 											Edit
 										</Button>
@@ -355,6 +391,7 @@ function UserAccountSettings() {
 																variant="destructive"
 																size="sm"
 																className="w-full sm:w-auto"
+																disabled={isAuthBusy}
 															>
 																<LogOut className="h-4 w-4" />
 																Sign Out
@@ -366,7 +403,7 @@ function UserAccountSettings() {
 																}
 																variant="destructive"
 																size="sm"
-																disabled={revokeSession.isPending}
+																disabled={isAuthBusy}
 																className="w-full sm:w-auto"
 															>
 																<UserX className="h-4 w-4" />
@@ -396,7 +433,7 @@ function UserAccountSettings() {
 												onClick={() => void handleRevokeOtherSessions()}
 												variant="destructive"
 												size="sm"
-												disabled={revokeOtherSessions.isPending}
+												disabled={isAuthBusy}
 												className="w-full sm:w-auto"
 											>
 												<UserX className="h-4 w-4" />

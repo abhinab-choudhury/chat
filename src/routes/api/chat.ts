@@ -58,6 +58,18 @@ export const Route = createFileRoute("/api/chat")({
 				};
 
 				try {
+					const earlySession = await auth.api
+						.getSession({ headers: request.headers })
+						.catch(() => null);
+					if (!earlySession?.user?.id) {
+						return new Response(
+							JSON.stringify({ message: "Unauthorized" }),
+							{
+								status: 401,
+								headers: { "Content-Type": "application/json" },
+							},
+						);
+					}
 					const apiKey = process.env.GEMINI_API_KEY;
 					if (!apiKey) {
 						throw new ChatError("internal:api", {
@@ -88,11 +100,20 @@ export const Route = createFileRoute("/api/chat")({
 						body.assistantClientUuid?.trim() ||
 						(streamId ? `${streamId}:assistant` : undefined);
 
-					// Best-effort auth/ownership validation for durable, resumable streams.
+					// Require authentication for all chat requests.
 					const session = await auth.api
 						.getSession({ headers: request.headers })
 						.catch(() => null);
 					const sessionUserId = session?.user?.id as string | undefined;
+					if (!sessionUserId) {
+						return new Response(
+							JSON.stringify({ message: "Unauthorized" }),
+							{
+								status: 401,
+								headers: { "Content-Type": "application/json" },
+							},
+						);
+					}
 					const convex = getConvexServerClient();
 					if (threadId) {
 						if (!convex) {
@@ -101,7 +122,7 @@ export const Route = createFileRoute("/api/chat")({
 							});
 						}
 						// Fetch with owner context only; streaming/persistence is owner-only.
-						const ownerHint = sessionUserId ?? body.userId;
+						const ownerHint = sessionUserId;
 						const thread = await convex.query(convexApi.threads.getThread, {
 							threadId: threadId as any,
 							userId: ownerHint,
@@ -123,10 +144,8 @@ export const Route = createFileRoute("/api/chat")({
 							});
 							threadMarkedLive = true;
 						}
-					} else if (sessionUserId) {
+					} else {
 						effectiveUserId = sessionUserId;
-					} else if (body.userId) {
-						effectiveUserId = body.userId;
 					}
 
 					const model = body.model || "gemini-3.5-flash-lite";

@@ -36,6 +36,7 @@ function LoginPage() {
 	>(null);
 	const [error, setError] = React.useState<string | null>(null);
 	const [mounted, setMounted] = React.useState(false);
+	const busyRef = React.useRef(false);
 
 	React.useEffect(() => {
 		setMounted(true);
@@ -45,6 +46,8 @@ function LoginPage() {
 
 	const sendOtp = async (e: React.FormEvent) => {
 		e.preventDefault();
+		if (busyRef.current) return;
+		busyRef.current = true;
 		setError(null);
 		setLoading(true);
 		try {
@@ -61,11 +64,14 @@ function LoginPage() {
 			setError(err instanceof Error ? err.message : "Failed to send OTP");
 		} finally {
 			setLoading(false);
+			busyRef.current = false;
 		}
 	};
 
 	const verifyOtp = async (e: React.FormEvent) => {
 		e.preventDefault();
+		if (busyRef.current) return;
+		busyRef.current = true;
 		setError(null);
 		setLoading(true);
 		try {
@@ -82,10 +88,13 @@ function LoginPage() {
 			setError(err instanceof Error ? err.message : "Invalid OTP");
 		} finally {
 			setLoading(false);
+			busyRef.current = false;
 		}
 	};
 
 	const socialSignIn = async (provider: "google" | "github" | "twitch") => {
+		if (busyRef.current) return;
+		busyRef.current = true;
 		setError(null);
 		setPendingProvider(provider);
 		setLoading(true);
@@ -103,6 +112,7 @@ function LoginPage() {
 		} finally {
 			setLoading(false);
 			setPendingProvider(null);
+			busyRef.current = false;
 		}
 	};
 
@@ -232,6 +242,7 @@ function LoginPage() {
 										maxLength={6}
 										value={otp}
 										onChange={setOtp}
+										disabled={isBusy}
 									>
 										<InputOTPGroup>
 											{Array.from({ length: 6 }).map((_, i) => {

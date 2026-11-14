@@ -6,6 +6,7 @@ import {
 	SettingsIcon,
 	UserIcon,
 } from "lucide-react";
+import * as React from "react";
 import { Button } from "#/components/ui/button";
 import {
 	Sidebar,
@@ -34,7 +35,8 @@ export function AppSidebar() {
 	const collapsed = state === "collapsed";
 	const navigate = useNavigate();
 	const location = useLocation();
-	const { user, isPending } = useSession();
+	const { user, isPending, refetch } = useSession();
+	const [signingOut, setSigningOut] = React.useState(false);
 	const generatingTitleThreadIds = useChatStore(
 		(s) => s.generatingTitleThreadIds,
 	);
@@ -50,8 +52,15 @@ export function AppSidebar() {
 	) as any;
 
 	const handleSignOut = async () => {
-		await authClient.signOut();
-		void navigate({ to: "/" });
+		if (signingOut) return;
+		setSigningOut(true);
+		try {
+			await authClient.signOut();
+			await refetch();
+			void navigate({ to: "/" });
+		} finally {
+			setSigningOut(false);
+		}
 	};
 
 	const handleNewChat = () => {
@@ -177,6 +186,7 @@ export function AppSidebar() {
 								size="sm"
 								className="w-full justify-start"
 								title="Sign out"
+								disabled={signingOut}
 								onClick={() => void handleSignOut()}
 							>
 								<LogOutIcon className="mr-2 size-4" />

@@ -19,7 +19,17 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 
 					const url = new URL(request.url);
 					const threadId = url.searchParams.get("threadId");
-					const userIdParam = url.searchParams.get("userId");
+
+					const session = await auth.api
+						.getSession({ headers: request.headers })
+						.catch(() => null);
+					const sessionUserId = session?.user?.id as string | undefined;
+					if (!sessionUserId) {
+						return new Response(JSON.stringify({ message: "Unauthorized" }), {
+							status: 401,
+							headers: { "Content-Type": "application/json" },
+						});
+					}
 
 					// If thread context is provided, enforce owner-only access.
 					if (threadId) {
@@ -29,11 +39,7 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 								cause: "Convex server client is not configured.",
 							});
 						}
-						const session = await auth.api
-							.getSession({ headers: request.headers })
-							.catch(() => null);
-						const sessionUserId = session?.user?.id as string | undefined;
-						const ownerHint = sessionUserId ?? userIdParam ?? undefined;
+						const ownerHint = sessionUserId;
 						const thread = await convex.query(convexApi.threads.getThread, {
 							threadId: threadId as any,
 							userId: ownerHint,

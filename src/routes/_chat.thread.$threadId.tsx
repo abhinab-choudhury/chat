@@ -156,6 +156,8 @@ function RouteComponent() {
 
 	const [editingId, setEditingId] = React.useState<string | null>(null);
 	const [editingText, setEditingText] = React.useState("");
+	const viewportRef = React.useRef<HTMLDivElement>(null);
+	const [showScrollButton, setShowScrollButton] = React.useState(false);
 
 	const toggleThinking = React.useCallback((id: string) => {
 		setOpenThinkingIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -437,6 +439,18 @@ function RouteComponent() {
 		setThreadStreaming,
 	]);
 
+	React.useEffect(() => {
+		const el = viewportRef.current;
+		if (!el) return;
+		const check = () => {
+			const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 96;
+			setShowScrollButton(!atBottom);
+		};
+		el.addEventListener("scroll", check, { passive: true });
+		check();
+		return () => el.removeEventListener("scroll", check);
+	}, [messages]);
+
 	// Scrolling/follow behavior is handled by MessageScroller (autoScroll + defaultScrollPosition).
 
 	if (isPending) {
@@ -518,7 +532,7 @@ function RouteComponent() {
 		<div className="relative flex-1 min-h-0">
 			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 				<MessageScroller className="absolute inset-0">
-					<MessageScrollerViewport className="px-4 py-6 pb-36">
+					<MessageScrollerViewport ref={viewportRef} className="px-4 py-6 pb-36">
 						<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
 							{displayMessages.map(
 								(m: {
@@ -759,6 +773,23 @@ function RouteComponent() {
 			</MessageScrollerProvider>
 			<div className="absolute -bottom-5 left-0 right-0 w-full px-4 py-4 bg-transparent z-30">
 				<div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+					{showScrollButton ? (
+						<div className="flex justify-end">
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								className="rounded-full shadow-md"
+								onClick={() => {
+									const el = viewportRef.current;
+									if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+								}}
+							>
+								<ChevronDownIcon className="size-4" />
+								Scroll to bottom
+							</Button>
+						</div>
+					) : null}
 					{isOwner ? (
 						<ChatInput
 							value={input}

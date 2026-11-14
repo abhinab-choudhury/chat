@@ -215,7 +215,7 @@ export function ChatHome() {
 	}
 
 	return (
-		<div className="flex flex-1 flex-col items-center px-4 pb-6 pt-20">
+		<div className="flex flex-1 flex-col items-center px-4 pt-20">
 			<div className="flex w-full max-w-3xl flex-1 flex-col gap-4">
 				{!message.trim() && (
 					<>

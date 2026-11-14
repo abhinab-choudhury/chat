@@ -1,6 +1,7 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AppSidebar } from "#/components/app-sidebar";
 import { ThemeToggle } from "#/components/theme-toggle";
+import { getSession } from "#/lib/auth.functions";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -8,6 +9,12 @@ import {
 } from "#/components/ui/sidebar";
 
 export const Route = createFileRoute("/_chat")({
+	beforeLoad: async () => {
+		const session = await getSession();
+		if (!session) {
+			throw redirect({ to: "/login" });
+		}
+	},
 	component: RouteComponent,
 });
 
