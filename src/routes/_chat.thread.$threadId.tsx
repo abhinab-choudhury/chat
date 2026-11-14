@@ -77,6 +77,10 @@ function RouteComponent() {
 	const setThreadId = useChatStore((s) => s.setThreadId);
 	const pendingAutoSend = useChatStore((s) => s.pendingAutoSend);
 	const setPendingAutoSend = useChatStore((s) => s.setPendingAutoSend);
+	const pendingInitialMessage = useChatStore((s) => s.pendingInitialMessage);
+	const setPendingInitialMessage = useChatStore(
+		(s) => s.setPendingInitialMessage,
+	);
 	const selectedModel = useModelStore((s) => s.selectedModel);
 	const setSelectedModel = useModelStore((s) => s.setSelectedModel);
 	const [streamingText, setStreamingText] = React.useState("");
@@ -138,10 +142,25 @@ function RouteComponent() {
 						content: m.content,
 					}),
 				);
-				const history =
+				let history =
 					sendUser && trimmed
 						? [...baseHistory, { role: "user" as const, content: trimmed }]
 						: baseHistory;
+
+				// Optimistic path: on first auto-send, include the pending initial
+				// message if it hasn't appeared in the Convex query yet.
+				if (!sendUser && pendingInitialMessage) {
+					const hasPending = baseHistory.some(
+						(m) => m.role === "user" && m.content === pendingInitialMessage,
+					);
+					if (!hasPending) {
+						history = [
+							...baseHistory,
+							{ role: "user" as const, content: pendingInitialMessage },
+						];
+					}
+					setPendingInitialMessage(null);
+				}
 
 				const streamId = crypto.randomUUID();
 				void setThreadStreaming({
@@ -207,6 +226,8 @@ function RouteComponent() {
 			isOwner,
 			currentUserId,
 			setThreadStreaming,
+			pendingInitialMessage,
+			setPendingInitialMessage,
 		],
 	);
 	const autoSentRef = React.useRef(false);

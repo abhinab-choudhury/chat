@@ -26,19 +26,21 @@ export function ChatHome() {
 	const navigate = useNavigate();
 	const createThread = useMutation(api.threads.createThread);
 	const sendMessage = useMutation(api.messages.sendMessage);
+	const renameThread = useMutation(api.threads.renameThread);
 	const message = useChatStore((s) => s.input);
 	const setMessage = useChatStore((s) => s.setInput);
 	const busy = useChatStore((s) => s.busy);
 	const setBusy = useChatStore((s) => s.setBusy);
 	const setPendingAutoSend = useChatStore((s) => s.setPendingAutoSend);
+	const setPendingInitialMessage = useChatStore(
+		(s) => s.setPendingInitialMessage,
+	);
 	const model = useModelStore((s) => s.selectedModel);
 	const setModel = useModelStore((s) => s.setSelectedModel);
 	const submittingRef = React.useRef(false);
 
 	const isAuthenticated = Boolean(user);
-	const userId = isPending
-		? null
-		: (user?.id ?? getCurrentUserId(null));
+	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
 
 	const categories = isAuthenticated
 		? DEFAULT_QUESTION_CATEGORIES.map((category) =>
@@ -54,29 +56,46 @@ export function ChatHome() {
 		submittingRef.current = true;
 		setBusy(true);
 		setMessage("");
+
+		const fallbackTitle = trimmed
+			.split(/\s+/)
+			.slice(0, 5)
+			.join(" ")
+			.slice(0, 40);
 		const clientUuid = crypto.randomUUID();
-		let title = trimmed.split(/\s+/).slice(0, 5).join(" ").slice(0, 40);
-		try {
-			const generated = await generateTitle({ data: { message: trimmed } });
-			if (generated?.title) title = generated.title;
-		} catch {
-			// keep fallback
-		}
+
+		// Generate title in background so thread creation/navigation aren't blocked.
+		const titlePromise = generateTitle({ data: { message: trimmed } })
+			.then((generated) => generated?.title || fallbackTitle)
+			.catch(() => fallbackTitle);
+
 		try {
 			const threadId = await createThread({
 				userId,
-				title,
+				title: fallbackTitle,
 				clientUuid,
 			});
-			await sendMessage({
+
+			void titlePromise.then((title) => {
+				if (title && title !== fallbackTitle) {
+					void renameThread({ threadId, title });
+				}
+			});
+
+			const sendPromise = sendMessage({
 				clientUuid: crypto.randomUUID(),
 				threadId,
 				role: "user",
 				content: trimmed,
 				userId,
+			}).catch((err) => {
+				console.error("Failed to persist initial message", err);
 			});
+
+			setPendingInitialMessage(trimmed);
 			setPendingAutoSend(true);
-			await navigate({ to: "/thread/$threadId", params: { threadId } });
+			void navigate({ to: "/thread/$threadId", params: { threadId } });
+			await sendPromise;
 		} catch (e) {
 			console.error(e);
 			setMessage(trimmed);
@@ -88,11 +107,13 @@ export function ChatHome() {
 		message,
 		createThread,
 		sendMessage,
+		renameThread,
 		navigate,
 		userId,
 		setMessage,
 		setBusy,
 		setPendingAutoSend,
+		setPendingInitialMessage,
 	]);
 
 	const handleSelect = React.useCallback(

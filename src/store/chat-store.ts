@@ -39,6 +39,8 @@ export interface ChatStoreState {
 	threadTitle: string | null;
 	/** Whether the next thread view should auto-send the current input. */
 	pendingAutoSend: boolean;
+	/** Initial user message content to use for the pending auto-send (optimistic). */
+	pendingInitialMessage: string | null;
 	/** Uploaded files attached to the current chat. */
 	uploadedFiles: UploadedFile[];
 	/** Whether files are currently uploading. */
@@ -70,6 +72,7 @@ export interface ChatStoreActions {
 	setStreamId: (streamId: string | null) => void;
 	setThreadTitle: (title: string | null) => void;
 	setPendingAutoSend: (value: boolean) => void;
+	setPendingInitialMessage: (message: string | null) => void;
 	setMessages: (messages: ChatStoreMessage[]) => void;
 	appendMessage: (message: ChatStoreMessage) => void;
 	clearMessages: () => void;
@@ -90,6 +93,7 @@ const initialState: ChatStoreState = {
 	streamId: null,
 	threadTitle: null,
 	pendingAutoSend: false,
+	pendingInitialMessage: null,
 	uploading: false,
 	uploadedFiles: [],
 };
@@ -153,6 +157,8 @@ export const useChatStore = create<ChatStore>((set) => ({
 	setStreamId: (streamId) => set({ streamId }),
 	setThreadTitle: (title) => set({ threadTitle: title }),
 	setPendingAutoSend: (value) => set({ pendingAutoSend: value }),
+	setPendingInitialMessage: (message) =>
+		set({ pendingInitialMessage: message }),
 	setMessages: (messages) => set({ messages }),
 	appendMessage: (message) =>
 		set((state) => ({ messages: [...state.messages, message] })),
