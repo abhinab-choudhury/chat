@@ -3,6 +3,7 @@ import { math } from "@streamdown/math";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
+	CheckIcon,
 	ChevronDownIcon,
 	ChevronRightIcon,
 	CopyIcon,
@@ -22,6 +23,7 @@ import {
 	writeCachedMessages,
 } from "#/lib/local-chat-cache";
 import { getCurrentUserId } from "#/lib/user-id";
+import { cn } from "#/lib/utils";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
 
@@ -49,30 +51,10 @@ function RouteComponent() {
 		api.threads.getThread,
 		{
 			key: `thread:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined as
-				| {
-						_id: string;
-						userId: string;
-						title: string;
-						isPublic?: boolean;
-						isLive?: boolean;
-						currentStreamId?: string;
-				  }
-				| null
-				| undefined,
+			default: undefined as any,
 		},
 		{ threadId, userId: currentUserId ?? undefined },
-	) as
-		| {
-				_id: string;
-				userId: string;
-				title: string;
-				isPublic?: boolean;
-				isLive?: boolean;
-				currentStreamId?: string;
-		  }
-		| null
-		| undefined;
+	) as any;
 	const canView =
 		!!thread &&
 		!!currentUserId &&
@@ -81,24 +63,10 @@ function RouteComponent() {
 		api.messages.getMessages,
 		{
 			key: `messages:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined as
-				| Array<{
-						_id: string;
-						role: string;
-						content: string;
-						createdAt?: number;
-				  }>
-				| undefined,
+			default: undefined as any,
 		},
 		canView ? { threadId, userId: currentUserId ?? undefined } : "skip",
-	) as
-		| Array<{
-				_id: string;
-				role: string;
-				content: string;
-				createdAt?: number;
-		  }>
-		| undefined;
+	) as any;
 	const cachedMessages = React.useMemo(
 		() => readCachedMessages(threadId) ?? [],
 		[threadId],
@@ -112,11 +80,13 @@ function RouteComponent() {
 						_id: string;
 						role: string;
 						content: string;
+						reasoning?: string;
 						createdAt?: number;
 					}) => ({
 						_id: String(m._id),
 						role: m.role,
 						content: m.content,
+						reasoning: m.reasoning,
 						createdAt: m.createdAt,
 					}),
 				),
@@ -168,11 +138,31 @@ function RouteComponent() {
 	const [streamingText, setStreamingText] = React.useState("");
 	const [streamingReasoning, setStreamingReasoning] = React.useState("");
 	const [thinkingOpen, setThinkingOpen] = React.useState(false);
+	const [openThinkingIds, setOpenThinkingIds] = React.useState<
+		Record<string, boolean>
+	>({});
+	const [copiedId, setCopiedId] = React.useState<string | null>(null);
 	const isOwner =
 		!!thread && !!currentUserId && thread.userId === currentUserId;
 
 	const [editingId, setEditingId] = React.useState<string | null>(null);
 	const [editingText, setEditingText] = React.useState("");
+
+	const toggleThinking = React.useCallback((id: string) => {
+		setOpenThinkingIds((prev) => ({ ...prev, [id]: !prev[id] }));
+	}, []);
+
+	const copyText = React.useCallback(async (id: string, text: string) => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopiedId(id);
+			window.setTimeout(() => {
+				setCopiedId((current) => (current === id ? null : current));
+			}, 1200);
+		} catch (e) {
+			console.error(e);
+		}
+	}, []);
 
 	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const sendingRef = React.useRef(false);
@@ -220,12 +210,10 @@ function RouteComponent() {
 					});
 				}
 
-				const baseHistory = (messages ?? []).map(
-					(m: { role: string; content: string }) => ({
-						role: m.role as "user" | "assistant" | "system",
-						content: m.content,
-					}),
-				);
+				const baseHistory = (messages ?? []).map((m: any) => ({
+					role: m.role as "user" | "assistant" | "system",
+					content: m.content,
+				}));
 				let history =
 					sendUser && trimmed
 						? [...baseHistory, { role: "user" as const, content: trimmed }]
@@ -235,7 +223,7 @@ function RouteComponent() {
 				// message if it hasn't appeared in the Convex query yet.
 				if (!sendUser && pendingInitialMessage) {
 					const hasPending = baseHistory.some(
-						(m) => m.role === "user" && m.content === pendingInitialMessage,
+						(m: any) => m.role === "user" && m.content === pendingInitialMessage,
 					);
 					if (!hasPending) {
 						history = [
@@ -247,6 +235,8 @@ function RouteComponent() {
 				}
 
 				const streamId = crypto.randomUUID();
+				const assistantClientUuid = `${streamId}:assistant`;
+				// Optimistic local mark; server also sets streaming state authoritatively.
 				void setThreadStreaming({
 					threadId,
 					isLive: true,
@@ -264,6 +254,9 @@ function RouteComponent() {
 						messages: history,
 						model: selectedModel,
 						streamId,
+						threadId,
+						userId: currentUserId ?? undefined,
+						assistantClientUuid,
 					}),
 				});
 
@@ -314,12 +307,14 @@ function RouteComponent() {
 
 				setStreamingText("");
 				setStreamingReasoning("");
-				if (accumulated.trim()) {
+				if (accumulated.trim() || reasoningAccumulated.trim()) {
+					// Idempotent fallback: server finalizes on completion, client save is safe.
 					await send({
-						clientUuid: crypto.randomUUID(),
+						clientUuid: assistantClientUuid,
 						threadId,
 						role: "assistant",
 						content: accumulated,
+						reasoning: reasoningAccumulated.trim() || undefined,
 						userId: currentUserId ?? undefined,
 					});
 				}
@@ -374,8 +369,19 @@ function RouteComponent() {
 		setStreamingReasoning("");
 		setThinkingOpen(false);
 		(async () => {
+			const assistantClientUuid = `${thread.currentStreamId}:assistant`;
 			try {
-				const res = await fetch(`/api/chat/${thread.currentStreamId}/stream`);
+				const params = new URLSearchParams({
+					threadId,
+					...(currentUserId ? { userId: currentUserId } : {}),
+				});
+				const res = await fetch(
+					`/api/chat/${thread.currentStreamId}/stream?${params.toString()}`,
+				);
+				if (res.status === 204) {
+					void setThreadStreaming({ threadId, isLive: false });
+					return;
+				}
 				if (!res.ok || !res.body) {
 					void setThreadStreaming({ threadId, isLive: false });
 					return;
@@ -413,12 +419,13 @@ function RouteComponent() {
 
 				setStreamingText("");
 				setStreamingReasoning("");
-				if (accumulated.trim()) {
+				if (accumulated.trim() || reasoningAccumulated.trim()) {
 					await send({
-						clientUuid: crypto.randomUUID(),
+						clientUuid: assistantClientUuid,
 						threadId,
 						role: "assistant",
 						content: accumulated,
+						reasoning: reasoningAccumulated.trim() || undefined,
 						userId: currentUserId ?? undefined,
 					});
 				}
@@ -485,11 +492,13 @@ function RouteComponent() {
 							_id: string;
 							role: string;
 							content: string;
+							reasoning?: string;
 						}>;
 						const list = [...source] as Array<{
 							_id: string;
 							role: string;
 							content: string;
+							reasoning?: string;
 							_optimistic?: boolean;
 						}>;
 						if (
@@ -511,10 +520,14 @@ function RouteComponent() {
 							_id: string;
 							role: string;
 							content: string;
+							reasoning?: string;
 							_optimistic?: boolean;
 						}) => {
 							const isUser = m.role === "user";
+							const isAssistant = m.role === "assistant";
 							const isEditing = editingId === m._id;
+							const isThinkingOpen = Boolean(openThinkingIds[m._id]);
+							const isCopied = copiedId === m._id;
 							return (
 								<Message
 									key={m._id}
@@ -562,58 +575,101 @@ function RouteComponent() {
 											</div>
 										</div>
 									) : (
-										<MessageContent
-											className={
-												isUser
-													? "select-text rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground"
-													: "select-text w-full text-sm"
-											}
-										>
-											{m.role === "assistant" ? (
-												<Markdown
-													content={m.content}
-													className="max-w-none w-full"
-												/>
-											) : (
-												m.content
-											)}
-										</MessageContent>
-									)}
-									{isUser && !isEditing && (
-										<div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/message:opacity-100">
-											<Button
-												type="button"
-												size="icon-xs"
-												variant="ghost"
-												aria-label="Retry"
-												onClick={() => void handleSubmit(m.content)}
+										<>
+											<MessageContent
+												className={
+													isUser
+														? "select-text rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground whitespace-pre-wrap"
+														: "select-text w-full text-sm"
+												}
 											>
-												<RotateCcwIcon className="size-3" />
-											</Button>
-											<Button
-												type="button"
-												size="icon-xs"
-												variant="ghost"
-												aria-label="Edit"
-												onClick={() => {
-													setEditingId(m._id);
-													setEditingText(m.content);
-												}}
+												{isAssistant && m.reasoning ? (
+													<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+														<button
+															type="button"
+															className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+															onClick={() => toggleThinking(m._id)}
+															aria-expanded={isThinkingOpen}
+														>
+															{isThinkingOpen ? (
+																<ChevronDownIcon className="size-3.5" />
+															) : (
+																<ChevronRightIcon className="size-3.5" />
+															)}
+															<span>Thinking</span>
+														</button>
+														{isThinkingOpen ? (
+															<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+																{m.reasoning}
+															</div>
+														) : null}
+													</div>
+												) : null}
+												{isAssistant ? (
+													<Markdown
+														content={m.content}
+														className="max-w-none w-full"
+													/>
+												) : (
+													m.content
+												)}
+											</MessageContent>
+											<div
+												className={cn(
+													"mt-1 flex items-center gap-1 transition-all duration-200",
+													isUser
+														? "justify-end opacity-0 group-hover/message:opacity-100 focus-within:opacity-100"
+														: "justify-start",
+												)}
 											>
-												<PencilIcon className="size-3" />
-											</Button>
-											<Button
-												type="button"
-												size="icon-xs"
-												variant="ghost"
-												aria-label="Copy"
-												onClick={() => {
-													void navigator.clipboard.writeText(m.content);
-												}}
-											>
-												<CopyIcon className="size-3" />
-											</Button>
-										</div>
+												{isUser && !m._optimistic ? (
+													<>
+														<Button
+															type="button"
+															size="icon-xs"
+															variant="ghost"
+															aria-label="Retry"
+															className="text-muted-foreground hover:text-foreground"
+															onClick={() => void handleSubmit(m.content)}
+														>
+															<RotateCcwIcon className="size-3" />
+														</Button>
+														<Button
+															type="button"
+															size="icon-xs"
+															variant="ghost"
+															aria-label="Edit"
+															className="text-muted-foreground hover:text-foreground"
+															onClick={() => {
+																setEditingId(m._id);
+																setEditingText(m.content);
+															}}
+														>
+															<PencilIcon className="size-3" />
+														</Button>
+													</>
+												) : null}
+												{(m.content || "").trim() ? (
+													<Button
+														type="button"
+														size="icon-xs"
+														variant="ghost"
+														aria-label={isCopied ? "Copied" : "Copy"}
+														className={cn(
+															"text-muted-foreground transition-all duration-200 hover:text-foreground",
+															isCopied && "scale-110 text-foreground",
+														)}
+														onClick={() => void copyText(m._id, m.content)}
+													>
+														{isCopied ? (
+															<CheckIcon className="size-3" />
+														) : (
+															<CopyIcon className="size-3" />
+														)}
+													</Button>
+												) : null}
+											</div>
+										</>
 									)}
 								</Message>
 							);
@@ -624,10 +680,10 @@ function RouteComponent() {
 							<Message align="start" className="w-full self-start">
 								<MessageContent className="select-text w-full text-sm">
 									{streamingReasoning ? (
-										<div className="mb-2 rounded-lg border border-border/60 bg-muted/20">
+										<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
 											<button
 												type="button"
-												className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground hover:text-foreground"
+												className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
 												onClick={() => setThinkingOpen((v) => !v)}
 												aria-expanded={thinkingOpen}
 											>
@@ -642,7 +698,7 @@ function RouteComponent() {
 												) : null}
 											</button>
 											{thinkingOpen ? (
-												<div className="border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+												<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
 													{streamingReasoning}
 												</div>
 											) : null}

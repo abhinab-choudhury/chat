@@ -5,6 +5,8 @@ export const messages = defineTable({
 	threadId: v.id("threads"),
 	role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
 	content: v.string(),
+	// Optional model reasoning/thinking trace (hidden by default in UI)
+	reasoning: v.optional(v.string()),
 	authorId: v.optional(v.string()),
 	clientUuid: v.optional(v.string()),
 	createdAt: v.number(),

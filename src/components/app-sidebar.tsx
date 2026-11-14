@@ -44,10 +44,10 @@ export function AppSidebar() {
 		api.threads.listThreads,
 		{
 			key: userId ? `threads:${userId}` : "threads:anon",
-			default: [] as Array<{ _id: string; title: string; archived?: boolean }>,
+			default: [] as any,
 		},
 		userId ? { userId } : "skip",
-	) as Array<{ _id: string; title: string; archived?: boolean }> | undefined;
+	) as any;
 
 	const handleSignOut = async () => {
 		await authClient.signOut();
@@ -84,8 +84,8 @@ export function AppSidebar() {
 					<SidebarGroupContent>
 						<SidebarMenu>
 							{(threads ?? [])
-								.filter((t) => !t.archived)
-								.map((thread) => {
+								.filter((t: any) => !t.archived)
+								.map((thread: any) => {
 									const isActive =
 										location.pathname === `/thread/${thread._id}`;
 									return (
@@ -121,7 +121,7 @@ export function AppSidebar() {
 									);
 								})}
 							{(!threads ||
-								threads.filter((t) => !t.archived).length === 0) && (
+								threads.filter((t: any) => !t.archived).length === 0) && (
 								<SidebarMenuItem>
 									<SidebarMenuButton tooltip="No conversations yet">
 										{!collapsed ? <span>No conversations yet</span> : null}

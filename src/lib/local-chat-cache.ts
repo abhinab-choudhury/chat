@@ -2,6 +2,7 @@ type CachedMessage = {
 	_id: string;
 	role: string;
 	content: string;
+	reasoning?: string;
 	createdAt?: number;
 };
 
@@ -52,6 +53,7 @@ export function writeCachedMessages(
 		_id: String(m._id),
 		role: String(m.role),
 		content: String(m.content ?? ""),
+		reasoning: m.reasoning ? String(m.reasoning) : undefined,
 		createdAt: typeof m.createdAt === "number" ? m.createdAt : undefined,
 	}));
 	safeSet(`${PREFIX}:messages:${threadId}`, trimmed);

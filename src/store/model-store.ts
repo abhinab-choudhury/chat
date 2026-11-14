@@ -7,7 +7,7 @@ export interface ChatModel {
 }
 
 export const DEFAULT_MODELS: ChatModel[] = [
-	{ id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (free tier)" },
+	{ id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (thinking)" },
 	{ id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (free tier)" },
 	{ id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (free tier)" },
 	{ id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite (free tier)" },

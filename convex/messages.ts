@@ -26,6 +26,7 @@ export const sendMessage = mutation({
 		threadId: v.id("threads"),
 		role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
 		content: v.string(),
+		reasoning: v.optional(v.string()),
 		authorId: v.optional(v.string()),
 		userId: v.optional(v.string()),
 		isStreaming: v.optional(v.boolean()),
@@ -48,6 +49,7 @@ export const sendMessage = mutation({
 			threadId: args.threadId,
 			role: args.role,
 			content: args.content,
+			reasoning: args.reasoning,
 			authorId: args.authorId ?? args.userId,
 			clientUuid: args.clientUuid,
 			createdAt: Date.now(),
@@ -60,21 +62,37 @@ export const sendMessage = mutation({
 
 // Update the content of an existing message (e.g. after editing).
 export const updateMessage = mutation({
-	args: { messageId: v.id("messages"), content: v.string() },
+	args: {
+		messageId: v.id("messages"),
+		content: v.string(),
+		reasoning: v.optional(v.string()),
+	},
 	handler: async (ctx, args) => {
-		await ctx.db.patch(args.messageId, { content: args.content });
+		await ctx.db.patch(args.messageId, {
+			content: args.content,
+			...(args.reasoning !== undefined ? { reasoning: args.reasoning } : {}),
+		});
 	},
 });
 
 // Append to an in-flight assistant message (streaming). Uses clientUuid to find it.
 export const appendMessage = mutation({
-	args: { clientUuid: v.string(), content: v.string(), isStreaming: v.boolean() },
+	args: {
+		clientUuid: v.string(),
+		content: v.string(),
+		reasoning: v.optional(v.string()),
+		isStreaming: v.boolean(),
+	},
 	handler: async (ctx, args) => {
 		const existing = await ctx.db
 			.query("messages")
 			.withIndex("by_client_uuid", (q) => q.eq("clientUuid", args.clientUuid))
 			.unique();
 		if (!existing) throw new Error("message not found");
-		await ctx.db.patch(existing._id, { content: args.content, isStreaming: args.isStreaming });
+		await ctx.db.patch(existing._id, {
+			content: args.content,
+			...(args.reasoning !== undefined ? { reasoning: args.reasoning } : {}),
+			isStreaming: args.isStreaming,
+		});
 	},
 });
