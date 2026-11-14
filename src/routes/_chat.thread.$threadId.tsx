@@ -1,7 +1,7 @@
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import {
 	ChevronDownIcon,
 	ChevronRightIcon,
@@ -16,6 +16,7 @@ import { Markdown } from "#/components/markdown";
 import { Button } from "#/components/ui/button";
 import { Message, MessageContent } from "#/components/ui/message";
 import { useSession } from "#/hooks/auth-hooks";
+import { useDiskCachedQuery } from "#/lib/convex-cached-query";
 import {
 	readCachedMessages,
 	writeCachedMessages,
@@ -44,18 +45,60 @@ function RouteComponent() {
 	const { user, isPending } = useSession();
 	const currentUserId = isPending ? null : (user?.id ?? getCurrentUserId(null));
 
-	const thread = useQuery(api.threads.getThread, {
-		threadId,
-		userId: currentUserId ?? undefined,
-	});
+	const thread = useDiskCachedQuery(
+		api.threads.getThread,
+		{
+			key: `thread:${threadId}:${currentUserId ?? "anon"}`,
+			default: undefined as
+				| {
+						_id: string;
+						userId: string;
+						title: string;
+						isPublic?: boolean;
+						isLive?: boolean;
+						currentStreamId?: string;
+				  }
+				| null
+				| undefined,
+		},
+		{ threadId, userId: currentUserId ?? undefined },
+	) as
+		| {
+				_id: string;
+				userId: string;
+				title: string;
+				isPublic?: boolean;
+				isLive?: boolean;
+				currentStreamId?: string;
+		  }
+		| null
+		| undefined;
 	const canView =
 		!!thread &&
 		!!currentUserId &&
 		(thread.userId === currentUserId || !!thread.isPublic);
-	const messages = useQuery(
+	const messages = useDiskCachedQuery(
 		api.messages.getMessages,
+		{
+			key: `messages:${threadId}:${currentUserId ?? "anon"}`,
+			default: undefined as
+				| Array<{
+						_id: string;
+						role: string;
+						content: string;
+						createdAt?: number;
+				  }>
+				| undefined,
+		},
 		canView ? { threadId, userId: currentUserId ?? undefined } : "skip",
-	);
+	) as
+		| Array<{
+				_id: string;
+				role: string;
+				content: string;
+				createdAt?: number;
+		  }>
+		| undefined;
 	const cachedMessages = React.useMemo(
 		() => readCachedMessages(threadId) ?? [],
 		[threadId],

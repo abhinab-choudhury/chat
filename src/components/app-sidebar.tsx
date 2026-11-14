@@ -1,5 +1,4 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
 import {
 	LogOutIcon,
 	MessageSquareIcon,
@@ -25,6 +24,7 @@ import {
 } from "#/components/ui/sidebar";
 import { useSession } from "#/hooks/auth-hooks";
 import { authClient } from "#/lib/auth-client";
+import { useDiskCachedQuery } from "#/lib/convex-cached-query";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { api } from "../../convex/_generated/api";
@@ -40,10 +40,14 @@ export function AppSidebar() {
 	);
 
 	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
-	const threads = useQuery(
+	const threads = useDiskCachedQuery(
 		api.threads.listThreads,
+		{
+			key: userId ? `threads:${userId}` : "threads:anon",
+			default: [] as Array<{ _id: string; title: string; archived?: boolean }>,
+		},
 		userId ? { userId } : "skip",
-	);
+	) as Array<{ _id: string; title: string; archived?: boolean }> | undefined;
 
 	const handleSignOut = async () => {
 		await authClient.signOut();
