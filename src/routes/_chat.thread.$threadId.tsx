@@ -336,8 +336,35 @@ function RouteComponent() {
 				className="flex-1 overflow-y-auto px-4 py-6"
 			>
 				<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-					{(messages ?? []).map(
-						(m: { _id: string; role: string; content: string }) => {
+					{(() => {
+						const list = [...(messages ?? [])] as Array<{
+							_id: string;
+							role: string;
+							content: string;
+							_optimistic?: boolean;
+						}>;
+						if (
+							pendingInitialMessage &&
+							!list.some(
+								(m) =>
+									m.role === "user" && m.content === pendingInitialMessage,
+							)
+						) {
+							list.push({
+								_id: "__optimistic_user__",
+								role: "user",
+								content: pendingInitialMessage,
+								_optimistic: true,
+							});
+						}
+						return list;
+					})().map(
+						(m: {
+							_id: string;
+							role: string;
+							content: string;
+							_optimistic?: boolean;
+						}) => {
 							const isUser = m.role === "user";
 							const isEditing = editingId === m._id;
 							return (
@@ -457,7 +484,7 @@ function RouteComponent() {
 							</MessageContent>
 						</Message>
 					)}
-					{busy && !streamingText && (
+					{(busy || pendingAutoSend) && !streamingText && (
 						<div className="self-start text-xs text-muted-foreground">
 							Thinking…
 						</div>

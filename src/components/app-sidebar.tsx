@@ -26,6 +26,7 @@ import {
 import { useSession } from "#/hooks/auth-hooks";
 import { authClient } from "#/lib/auth-client";
 import { getCurrentUserId } from "#/lib/user-id";
+import { useChatStore } from "#/store/chat-store";
 import { api } from "../../convex/_generated/api";
 
 export function AppSidebar() {
@@ -34,6 +35,9 @@ export function AppSidebar() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { user, isPending } = useSession();
+	const generatingTitleThreadIds = useChatStore(
+		(s) => s.generatingTitleThreadIds,
+	);
 
 	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
 	const threads = useQuery(
@@ -95,7 +99,16 @@ export function AppSidebar() {
 													>
 														<MessageSquareIcon className="size-4" />
 														{!collapsed ? (
-															<span className="truncate">{thread.title}</span>
+															generatingTitleThreadIds.includes(thread._id) ? (
+																<span className="inline-flex min-w-0 flex-1 items-center gap-2">
+																	<span className="truncate text-muted-foreground">
+																		{thread.title}
+																	</span>
+																	<span className="h-3 w-14 shrink-0 animate-pulse rounded bg-muted-foreground/20" />
+																</span>
+															) : (
+																<span className="truncate">{thread.title}</span>
+															)
 														) : null}
 													</Link>
 												</SidebarMenuButton>

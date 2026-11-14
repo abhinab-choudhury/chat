@@ -1,9 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import * as React from "react";
+import { Message, MessageContent } from "#/components/ui/message";
 import { useSession } from "#/hooks/auth-hooks";
 import { generateTitle } from "#/lib/ai.functions";
-
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
@@ -35,6 +35,7 @@ export function ChatHome() {
 	const setPendingInitialMessage = useChatStore(
 		(s) => s.setPendingInitialMessage,
 	);
+	const setGeneratingTitle = useChatStore((s) => s.setGeneratingTitle);
 	const model = useModelStore((s) => s.selectedModel);
 	const setModel = useModelStore((s) => s.setSelectedModel);
 	const submittingRef = React.useRef(false);
@@ -50,12 +51,18 @@ export function ChatHome() {
 			)
 		: DEFAULT_QUESTION_CATEGORIES;
 
+	const [optimisticMessage, setOptimisticMessage] = React.useState<
+		string | null
+	>(null);
+
 	const handleSubmit = React.useCallback(async () => {
 		const trimmed = message.trim();
 		if (!trimmed || !userId || submittingRef.current) return;
 		submittingRef.current = true;
 		setBusy(true);
 		setMessage("");
+		// Show optimistic chat view immediately to avoid home-screen flash.
+		setOptimisticMessage(trimmed);
 
 		const fallbackTitle = trimmed
 			.split(/\s+/)
@@ -64,11 +71,6 @@ export function ChatHome() {
 			.slice(0, 40);
 		const clientUuid = crypto.randomUUID();
 
-		// Generate title in background so thread creation/navigation aren't blocked.
-		const titlePromise = generateTitle({ data: { message: trimmed } })
-			.then((generated) => generated?.title || fallbackTitle)
-			.catch(() => fallbackTitle);
-
 		try {
 			const threadId = await createThread({
 				userId,
@@ -76,11 +78,19 @@ export function ChatHome() {
 				clientUuid,
 			});
 
-			void titlePromise.then((title) => {
-				if (title && title !== fallbackTitle) {
-					void renameThread({ threadId, title });
-				}
-			});
+			// Generate and apply title in background (sidebar shows skeleton).
+			setGeneratingTitle(threadId, true);
+			void generateTitle({ data: { message: trimmed } })
+				.then((generated) => generated?.title || fallbackTitle)
+				.then((title) => {
+					if (title && title !== fallbackTitle) {
+						void renameThread({ threadId, title });
+					}
+				})
+				.catch(() => {})
+				.finally(() => {
+					setGeneratingTitle(threadId, false);
+				});
 
 			const sendPromise = sendMessage({
 				clientUuid: crypto.randomUUID(),
@@ -98,6 +108,7 @@ export function ChatHome() {
 			await sendPromise;
 		} catch (e) {
 			console.error(e);
+			setOptimisticMessage(null);
 			setMessage(trimmed);
 		} finally {
 			submittingRef.current = false;
@@ -114,6 +125,7 @@ export function ChatHome() {
 		setBusy,
 		setPendingAutoSend,
 		setPendingInitialMessage,
+		setGeneratingTitle,
 	]);
 
 	const handleSelect = React.useCallback(
@@ -122,6 +134,41 @@ export function ChatHome() {
 		},
 		[setMessage],
 	);
+
+	if (optimisticMessage) {
+		return (
+			<div className="relative flex flex-1 flex-col">
+				<div className="flex-1 overflow-y-auto px-4 py-6">
+					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+						<Message
+							align="end"
+							className="w-fit max-w-[75%] self-end flex-col items-end gap-1"
+						>
+							<MessageContent className="select-text w-full whitespace-pre-wrap rounded-2xl bg-primary px-4 py-2 text-sm text-primary-foreground">
+								{optimisticMessage}
+							</MessageContent>
+						</Message>
+						<div className="self-start text-xs text-muted-foreground">
+							Thinking…
+						</div>
+					</div>
+				</div>
+				<div className="sticky bottom-0 z-20 w-full px-4 pb-4">
+					<div className="mx-auto w-full max-w-3xl">
+						<ChatInput
+							value=""
+							onChange={() => {}}
+							onSubmit={() => {}}
+							disabled
+							model={model}
+							onModelChange={setModel}
+							placeholder="Starting chat…"
+						/>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex flex-1 flex-col items-center px-4 pb-6 pt-20">
