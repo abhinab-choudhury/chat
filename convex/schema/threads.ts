@@ -17,6 +17,7 @@ export const threads = defineTable({
 	streamStartedAt: v.optional(v.number()),
 })
 	.index("by_user", ["userId"])
+	.index("by_user_updated", ["userId", "updatedAt"])
 	.index("by_client_uuid", ["clientUuid"])
 	.searchIndex("search_title", {
 		searchField: "title",

@@ -6,11 +6,11 @@ import { v } from "convex/values";
 export const listThreads = query({
 	args: { userId: v.string() },
 	handler: async (ctx, args) => {
-		const threads = await ctx.db
+		return await ctx.db
 			.query("threads")
-			.withIndex("by_user", (q) => q.eq("userId", args.userId))
+			.withIndex("by_user_updated", (q) => q.eq("userId", args.userId))
+			.order("desc")
 			.collect();
-		return threads.sort((a, b) => b.updatedAt - a.updatedAt);
 	},
 });
 
