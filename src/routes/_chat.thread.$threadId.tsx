@@ -344,7 +344,8 @@ function RouteComponent() {
 		if (
 			pendingAutoSend &&
 			isOwner &&
-			messages !== undefined &&
+			thread !== undefined &&
+			thread !== null &&
 			!autoSentRef.current
 		) {
 			autoSentRef.current = true;
@@ -471,15 +472,8 @@ function RouteComponent() {
 
 	if (thread === undefined) {
 		return (
-			<div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-				<p>Unable to load this thread.</p>
-				<button
-					type="button"
-					className="rounded-md border px-3 py-1 text-xs"
-					onClick={() => window.location.reload()}
-				>
-					Retry
-				</button>
+			<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+				Loading…
 			</div>
 		);
 	}
