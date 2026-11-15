@@ -9,6 +9,7 @@
  */
 
 import type * as messages from "../messages.js";
+import type * as projects from "../projects.js";
 import type * as schema_messages from "../schema/messages.js";
 import type * as schema_products from "../schema/products.js";
 import type * as schema_projects from "../schema/projects.js";
@@ -23,6 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   messages: typeof messages;
+  projects: typeof projects;
   "schema/messages": typeof schema_messages;
   "schema/products": typeof schema_products;
   "schema/projects": typeof schema_projects;

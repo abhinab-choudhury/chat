@@ -19,6 +19,7 @@ export const env = createEnv({
 		SMTP_USER: z.string().min(1).optional(),
 		SMTP_PASS: z.string().min(1).optional(),
 		EMAIL_FROM: z.string().min(1).optional(),
+		ENCRYPTION_KEY: z.string().min(1).optional(),
 		SUPERMEMORY_API_KEY: z.string().min(1).optional(),
 	},
 

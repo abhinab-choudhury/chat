@@ -14,6 +14,36 @@ export const listThreads = query({
 	},
 });
 
+// Title search used by the ⌘/Ctrl+K thread palette.
+// An empty term falls back to the user's most recently updated threads.
+export const searchThreads = query({
+	args: {
+		userId: v.string(),
+		query: v.string(),
+		limit: v.optional(v.number()),
+	},
+	handler: async (ctx, args) => {
+		const limit = Math.min(Math.max(Math.trunc(args.limit ?? 20), 1), 50);
+		const term = args.query.trim();
+
+		const results = term
+			? await ctx.db
+					.query("threads")
+					.withSearchIndex("search_title", (q) =>
+						q.search("title", term).eq("userId", args.userId),
+					)
+					.take(limit)
+			: await ctx.db
+					.query("threads")
+					.withIndex("by_user_updated", (q) => q.eq("userId", args.userId))
+					.order("desc")
+					.take(limit);
+
+		// Archived threads are hidden in the sidebar, so hide them here too.
+		return results.filter((thread) => !thread.archived);
+	},
+});
+
 export const getThread = query({
 	args: { threadId: v.id("threads"), userId: v.optional(v.string()) },
 	handler: async (ctx, args) => {
@@ -63,6 +93,22 @@ export const archiveThread = mutation({
 	args: { threadId: v.id("threads") },
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.threadId, { archived: true, updatedAt: Date.now() });
+	},
+});
+
+export const deleteThread = mutation({
+	args: { threadId: v.id("threads"), userId: v.string() },
+	handler: async (ctx, args) => {
+		const thread = await ctx.db.get(args.threadId);
+		if (!thread) throw new Error("Thread not found");
+		if (thread.userId !== args.userId) throw new Error("Not allowed");
+		// Remove messages belonging to this thread.
+		const messages = await ctx.db
+			.query("messages")
+			.withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+			.collect();
+		for (const m of messages) await ctx.db.delete(m._id);
+		await ctx.db.delete(args.threadId);
 	},
 });
 

@@ -38,7 +38,7 @@ export function getResumableStreamContext() {
 		publisher = publisher ?? createRedisClient(redisUrl);
 		subscriber = subscriber ?? createRedisClient(redisUrl);
 		context = createResumableStreamContext({
-			// Keep background reconnection promises tracked (intern3-chat pattern).
+			// Keep background reconnection promises tracked.
 			waitUntil: (promise) => promise,
 			publisher,
 			subscriber,
@@ -49,4 +49,3 @@ export function getResumableStreamContext() {
 		return null;
 	}
 }
-

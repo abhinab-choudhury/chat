@@ -9,10 +9,11 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ConvexProvider } from "convex/react";
 import { ThemeProvider } from "next-themes";
-import { env } from "#/env";
-import { TooltipProvider } from "../components/ui/tooltip";
-import { OnboardingGate } from "../components/onboarding/onboarding-gate";
 import { RouteErrorComponent } from "#/components/route-error";
+import { env } from "#/env";
+import { OnboardingGate } from "../components/onboarding/onboarding-gate";
+import { Toaster } from "../components/ui/sonner";
+import { TooltipProvider } from "../components/ui/tooltip";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { convexClient } from "../lib/convex";
 import appCss from "../styles.css?url";
@@ -23,7 +24,6 @@ interface MyRouterContext {
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	errorComponent: RouteErrorComponent,
-	notFoundComponent: RouteErrorComponent,
 	head: () => ({
 		meta: [
 			{
@@ -63,11 +63,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 					<ConvexProvider client={convexClient}>
 						{children}
 						<OnboardingGate />
+						<Toaster />
 					</ConvexProvider>
 				) : (
 					<>
 						{children}
 						<OnboardingGate />
+						<Toaster />
 					</>
 				)}
 			</TooltipProvider>

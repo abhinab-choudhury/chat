@@ -148,7 +148,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 	const webSearchEnabled = useModelStore(
 		(s) => s.toolsEnabled && s.enabledTools.includes("web_search"),
 	);
-	const geminiApiKey = useModelStore((s) => s.geminiApiKey);
+	const reasoningEffort = useModelStore((s) => s.reasoningEffort);
+	const memoryEnabled = useModelStore((s) => s.memoryEnabled);
 	const toggleWebSearchTool = useModelStore((s) => s.toggleTool);
 	const toggleWebSearch = React.useCallback(() => {
 		toggleWebSearchTool("web_search");
@@ -264,7 +265,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 						userId: currentUserId ?? undefined,
 						assistantClientUuid,
 						webSearch: webSearchEnabled,
-						apiKey: geminiApiKey || undefined,
+						memory: memoryEnabled,
+						reasoningEffort,
 					}),
 				});
 
@@ -330,6 +332,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			threadId,
 			selectedModel,
 			webSearchEnabled,
+			reasoningEffort,
+			memoryEnabled,
 			setBusy,
 			setInput,
 			isOwner,

@@ -1,5 +1,6 @@
 import { BraveSearchAdapter } from "./brave-search-adapter";
 import { FirecrawlSearchAdapter } from "./firecrawl-search-adapter";
+import { isSearchProviderType } from "./provider-catalog";
 import { SerperSearchAdapter } from "./serper-search-adapter";
 import { TavilySearchAdapter } from "./tavily-search-adapter";
 import type {
@@ -8,35 +9,6 @@ import type {
 	SearchProviderType,
 	SearchResult,
 } from "./types";
-
-// Server-side API keys; the first configured provider is used unless
-// SEARCH_PROVIDER names one explicitly.
-const PROVIDER_ENV_KEYS: Record<SearchProviderType, string> = {
-	firecrawl: "FIRECRAWL_API_KEY",
-	brave: "BRAVE_API_KEY",
-	tavily: "TAVILY_API_KEY",
-	serper: "SERPER_API_KEY",
-};
-
-const AUTO_DETECT_ORDER: SearchProviderType[] = [
-	"tavily",
-	"brave",
-	"firecrawl",
-	"serper",
-];
-
-export function getServerSearchProviderType(): SearchProviderType | undefined {
-	const explicit = process.env.SEARCH_PROVIDER?.trim() as
-		| SearchProviderType
-		| undefined;
-	if (explicit && explicit in PROVIDER_ENV_KEYS) {
-		if (process.env[PROVIDER_ENV_KEYS[explicit]]) return explicit;
-		return undefined;
-	}
-	return AUTO_DETECT_ORDER.find(
-		(provider) => process.env[PROVIDER_ENV_KEYS[provider]],
-	);
-}
 
 function createAdapter(
 	provider: SearchProviderType,
@@ -55,25 +27,24 @@ function createAdapter(
 }
 
 /**
- * Factory over the search provider adapters. Ported from intern3-chat's
- * SearchProvider: picks the provider, resolves the server-side key, and
- * delegates `search` to the matching adapter.
+ * Factory over the search provider adapters. The provider and key are supplied
+ * by the user's encrypted BYOK configuration, so the factory never falls back
+ * to server environment variables.
  */
 export class SearchProvider {
 	private adapter: SearchAdapter;
 
-	constructor(provider?: SearchProviderType) {
-		const resolved = provider ?? getServerSearchProviderType();
-		if (!resolved) {
+	constructor(provider: SearchProviderType, apiKey: string) {
+		if (!isSearchProviderType(provider)) {
+			throw new Error("Unsupported web search provider.");
+		}
+		const resolvedKey = apiKey?.trim();
+		if (!resolvedKey) {
 			throw new Error(
-				"No web search provider configured. Set one of TAVILY_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY or SERPER_API_KEY (or SEARCH_PROVIDER) on the server.",
+				`No ${provider} API key configured. Add one in Settings → Web Search.`,
 			);
 		}
-		const apiKey = process.env[PROVIDER_ENV_KEYS[resolved]];
-		if (!apiKey) {
-			throw new Error(`${PROVIDER_ENV_KEYS[resolved]} is not set`);
-		}
-		this.adapter = createAdapter(resolved, apiKey);
+		this.adapter = createAdapter(provider, resolvedKey);
 	}
 
 	async search(

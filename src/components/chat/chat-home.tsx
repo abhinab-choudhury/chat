@@ -26,10 +26,10 @@ import {
 } from "./suggested-questions";
 
 const AUTH_QUESTIONS = [
-	{ id: "a1", label: "Summarize the paper \"Attentation is All you Need\" by OpenAI" },
-	{ id: "a2", label: "Draft a reply to a customer" },
-	{ id: "a3", label: "Brainstorm ideas for a new feature" },
-	{ id: "a4", label: "Explain a code snippet" },
+  { id: "a1", label: "Create a 7-day launch email sequence for a SaaS app" },
+  { id: "a2", label: "Create a SQL schema for a multi-vendor marketplace" },
+  { id: "a3", label: "Create a 4-week beginner half-marathon training plan" },
+  { id: "a4", label: "Create a 60-second YouTube Short script on noise cancellation" },
 ];
 
 export function ChatHome() {

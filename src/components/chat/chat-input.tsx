@@ -12,10 +12,13 @@ import {
 } from "#/components/ui/select";
 import { cn } from "#/lib/utils";
 import { useModelStore } from "#/store/model-store";
+import { useHasSearchProvider } from "#/store/user-settings-store";
 
 interface ChatModel {
 	id: string;
 	label: string;
+	abilities?: string[];
+	supportsDisablingReasoning?: boolean;
 }
 
 interface ChatInputProps {
@@ -30,12 +33,52 @@ interface ChatInputProps {
 }
 
 const DEFAULT_MODELS: ChatModel[] = [
-	{ id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (thinking)" },
-	{ id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
-	{ id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
-	{ id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
-	{ id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite" },
+	{
+		id: "gemini-4-hydrogen",
+		label: "Gemini 4 Hydrogen",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.8-flash",
+		label: "Gemini 3.8 Flash",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.6-flash",
+		label: "Gemini 3.6 Flash",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.5-flash-lite",
+		label: "Gemini 3.5 Flash-Lite",
+		abilities: ["function_calling"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.1-flash-lite",
+		label: "Gemini 3.1 Flash-Lite",
+		abilities: ["function_calling"],
+		supportsDisablingReasoning: true,
+	},
 ];
+
+function modelSupportsReasoning(modelId: string, models: ChatModel[]): boolean {
+	const m = models.find((x) => x.id === modelId);
+	if (m?.abilities) {
+		return (
+			m.abilities.includes("reasoning") ||
+			m.abilities.includes("effort_control")
+		);
+	}
+	return (
+		/hydrogen|thinking|reason/i.test(modelId) ||
+		modelId.includes("gemini-2.5") ||
+		modelId.includes("gemini-3")
+	);
+}
 
 export function ChatInput({
 	value,
@@ -64,9 +107,12 @@ export function ChatInput({
 	const webSearchEnabled = useModelStore((s) =>
 		s.enabledTools.includes("web_search"),
 	);
+	const hasSearchProvider = useHasSearchProvider();
 	const toggleWebSearch = useModelStore((s) => s.toggleTool);
 	const reasoningEffort = useModelStore((s) => s.reasoningEffort);
 	const setReasoningEffort = useModelStore((s) => s.setReasoningEffort);
+	const thinkingSupported = modelSupportsReasoning(selectedModel, models);
+	const displayEffort = thinkingSupported ? reasoningEffort : "off";
 
 	const resize = React.useCallback(() => {
 		const el = textareaRef.current;
@@ -109,13 +155,15 @@ export function ChatInput({
 							webSearchEnabled ? "Disable web search" : "Enable web search"
 						}
 						title={
-							toolsEnabled
-								? webSearchEnabled
-									? "Web search enabled"
-									: "Enable web search"
-								: "Enable tools in Settings > AI Options first"
+							!hasSearchProvider
+								? "Add a web search provider in Settings → Web Search"
+								: !toolsEnabled
+									? "Enable tools in Settings → AI Options first"
+									: webSearchEnabled
+										? "Web search enabled"
+										: "Enable web search"
 						}
-						disabled={disabled || !toolsEnabled}
+						disabled={disabled || !toolsEnabled || !hasSearchProvider}
 						className={cn(
 							"size-8 shrink-0 rounded-xl",
 							webSearchEnabled &&
@@ -138,11 +186,11 @@ export function ChatInput({
 				</div>
 				<div className="flex flex-row gap-2">
 					<Select
-						value={reasoningEffort}
+						value={displayEffort}
 						onValueChange={(v) =>
 							setReasoningEffort(v as "off" | "low" | "medium" | "high")
 						}
-						disabled={disabled}
+						disabled={disabled || !thinkingSupported}
 					>
 						<SelectTrigger className="h-9 w-24 sm:w-28 rounded-xl text-xs font-medium">
 							<SelectValue placeholder="Reasoning" />

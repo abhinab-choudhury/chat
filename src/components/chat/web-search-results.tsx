@@ -49,8 +49,7 @@ const Favicon = React.memo(function Favicon({ url }: { url: string }) {
 /**
  * Collapsible web-search call strip: spinner/globe header with the query and
  * result count, and an expandable horizontal carousel of result cards
- * (favicon, screenshot, title, description, domain). Ported from
- * intern3-chat's WebSearchToolRenderer.
+ * (favicon, screenshot, title, description, domain).
  */
 export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 	const [expanded, setExpanded] = React.useState(false);

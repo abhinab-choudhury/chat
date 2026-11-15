@@ -1,17 +1,49 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import {
+	DEFAULT_SHORTCUTS,
+	type ShortcutAction,
+	type ShortcutBindings,
+} from "#/lib/shortcuts";
 
 export interface ChatModel {
 	id: string;
 	label: string;
+	abilities?: string[];
+	supportsDisablingReasoning?: boolean;
 }
 
 export const DEFAULT_MODELS: ChatModel[] = [
-	{ id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (thinking)" },
-	{ id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (free tier)" },
-	{ id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (free tier)" },
-	{ id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite (free tier)" },
-	{ id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (free tier)" },
+	{
+		id: "gemini-4-hydrogen",
+		label: "Gemini 4 Hydrogen",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.8-flash",
+		label: "Gemini 3.8 Flash",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.6-flash",
+		label: "Gemini 3.6 Flash",
+		abilities: ["reasoning", "function_calling", "effort_control"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.5-flash-lite",
+		label: "Gemini 3.5 Flash-Lite",
+		abilities: ["function_calling"],
+		supportsDisablingReasoning: true,
+	},
+	{
+		id: "gemini-3.1-flash-lite",
+		label: "Gemini 3.1 Flash-Lite",
+		abilities: ["function_calling"],
+		supportsDisablingReasoning: true,
+	},
 ];
 
 export const DEFAULT_SELECTED_MODEL = "gemini-3.5-flash-lite";
@@ -32,8 +64,8 @@ export interface ModelStoreState {
 	webSearchLimit: number;
 	webSearchScrape: boolean;
 	memoryEnabled: boolean;
-	geminiApiKey: string;
-	onboardingCompleted: boolean;
+	keyboardShortcutsEnabled: boolean;
+	shortcuts: ShortcutBindings;
 	defaultMcpOverrides: Record<string, boolean>;
 	mcpOverrides: McpOverrides;
 }
@@ -49,8 +81,9 @@ export interface ModelStoreActions {
 	setWebSearchLimit: (limit: number) => void;
 	setWebSearchScrape: (scrape: boolean) => void;
 	setMemoryEnabled: (enabled: boolean) => void;
-	setGeminiApiKey: (key: string) => void;
-	setOnboardingCompleted: (done: boolean) => void;
+	setKeyboardShortcutsEnabled: (enabled: boolean) => void;
+	setShortcut: (action: ShortcutAction, combo: string) => void;
+	resetShortcuts: () => void;
 	setDefaultMcpOverride: (server: string, enabled: boolean) => void;
 	setMcpOverride: (threadId: string, server: string, enabled: boolean) => void;
 	getMcpOverrides: (threadId: string) => Record<string, boolean>;
@@ -72,8 +105,8 @@ const initialState: ModelStoreState = {
 	webSearchLimit: 5,
 	webSearchScrape: true,
 	memoryEnabled: true,
-	geminiApiKey: "",
-	onboardingCompleted: false,
+	keyboardShortcutsEnabled: true,
+	shortcuts: DEFAULT_SHORTCUTS,
 	defaultMcpOverrides: {},
 	mcpOverrides: {},
 };
@@ -104,8 +137,13 @@ export const useModelStore = create<ModelStore>()(
 			setWebSearchLimit: (webSearchLimit) => set({ webSearchLimit }),
 			setWebSearchScrape: (webSearchScrape) => set({ webSearchScrape }),
 			setMemoryEnabled: (memoryEnabled) => set({ memoryEnabled }),
-			setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey }),
-			setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
+			setKeyboardShortcutsEnabled: (keyboardShortcutsEnabled) =>
+				set({ keyboardShortcutsEnabled }),
+			setShortcut: (action, combo) =>
+				set((state) => ({
+					shortcuts: { ...state.shortcuts, [action]: combo },
+				})),
+			resetShortcuts: () => set({ shortcuts: DEFAULT_SHORTCUTS }),
 
 			setDefaultMcpOverride: (server, enabled) =>
 				set((state) => ({
@@ -151,7 +189,18 @@ export const useModelStore = create<ModelStore>()(
 		{
 			name: "model-storage",
 			storage: createJSONStorage(() => localStorage),
-			version: 1,
+			version: 3,
+			migrate: (persisted: unknown) => {
+				// BYOK secrets moved to encrypted server-side storage; drop any
+				// plaintext keys left behind by older browser builds.
+				const p = { ...((persisted ?? {}) as Record<string, unknown>) };
+				delete p.geminiApiKey;
+				delete p.webSearchProvider;
+				delete p.webSearchApiKey;
+				delete p.supermemoryApiKey;
+				delete p.onboardingCompleted;
+				return p;
+			},
 			partialize: (state) => ({
 				selectedModel: state.selectedModel,
 				reasoningEffort: state.reasoningEffort,
@@ -161,8 +210,8 @@ export const useModelStore = create<ModelStore>()(
 				webSearchLimit: state.webSearchLimit,
 				webSearchScrape: state.webSearchScrape,
 				memoryEnabled: state.memoryEnabled,
-				geminiApiKey: state.geminiApiKey,
-				onboardingCompleted: state.onboardingCompleted,
+				keyboardShortcutsEnabled: state.keyboardShortcutsEnabled,
+				shortcuts: state.shortcuts,
 				defaultMcpOverrides: state.defaultMcpOverrides,
 				mcpOverrides: state.mcpOverrides,
 			}),

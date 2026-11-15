@@ -68,7 +68,7 @@ A robust sync layer for chat should treat the client as an offline-capable repli
 ### Recommended implementation steps
 1. Add route loaders for thread routes to coordinate auth and (when safe) prefetch data; use deferred/streaming rendering for slow parts.
 2. Introduce server-side Convex fetching for eligible SSR paths and hydrate into the client cache.
-3. Move toward a unified server chat action (intern3-chat style) to reduce client round-trips and centralize auth, persistence, and stream lifecycle.
+3. Move toward a unified server chat action to reduce client round-trips and centralize auth, persistence, and stream lifecycle.
 4. Persist and expose stream state for reconnect/resume so SSR/refresh never loses in-flight responses.
 5. Add telemetry (time-to-first-token, navigation-to-stream-start, title latency) to guide further tuning.
 

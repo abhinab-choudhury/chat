@@ -8,6 +8,20 @@
       "when": 1794466281035,
       "tag": "0000_needy_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794725963913,
+      "tag": "0001_user_byok_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794727485794,
+      "tag": "0002_remove_memory_key",
+      "breakpoints": true
     }
   ]
 }

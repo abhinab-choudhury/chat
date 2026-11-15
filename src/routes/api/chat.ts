@@ -10,10 +10,13 @@ import { ChatError, toChatError } from "#/lib/errors";
 import { getResumableStreamContext } from "#/lib/resumable-stream";
 import { SearchProvider } from "#/lib/search/search-provider";
 import {
+	type SearchProviderType,
 	summarizeResults,
 	type WebSearchToolCall,
 	type WebSearchToolData,
 } from "#/lib/search/types";
+
+type ReasoningEffort = "off" | "low" | "medium" | "high";
 
 type ChatBody = {
 	messages?: Array<{ role: string; content: string }>;
@@ -23,24 +26,25 @@ type ChatBody = {
 	userId?: string;
 	assistantClientUuid?: string;
 	webSearch?: boolean;
-	apiKey?: string;
+	memory?: boolean;
+	reasoningEffort?: ReasoningEffort;
 };
 
 const WEB_SEARCH_SYSTEM_PROMPT = `You have access to a web_search tool that searches the web for up-to-date information.
 
 Use it whenever the user asks about current events, recent developments, or anything your knowledge may be outdated on. Formulate a concise search query, review the returned results, and ground your answer in them. Cite the sources you used with inline markdown links like [title](url). Do not mention the tool itself in your answer.`;
 
-/** Builds the web_search AI tool. Ported from intern3-chat's WebSearchAdapter. */
-function createWebSearchTool() {
+/** Builds the web_search AI tool. */
+function createWebSearchTool(provider: SearchProviderType, apiKey: string) {
 	return tool({
 		description:
 			"Search the web for information. Returns a list of results with title, url and description.",
-		parameters: z.object({
+		inputSchema: z.object({
 			query: z.string().describe("The search query"),
 		}),
 		execute: async ({ query }) => {
 			try {
-				const searchProvider = new SearchProvider();
+				const searchProvider = new SearchProvider(provider, apiKey);
 				const results = await searchProvider.search(query, {
 					limit: 5,
 					scrapeContent: true,
@@ -121,8 +125,6 @@ export const Route = createFileRoute("/api/chat")({
 							headers: { "Content-Type": "application/json" },
 						});
 					}
-					let apiKey = process.env.GEMINI_API_KEY;
-
 					let body: ChatBody;
 					try {
 						body = (await request.json()) as ChatBody;
@@ -158,6 +160,8 @@ export const Route = createFileRoute("/api/chat")({
 						});
 					}
 					const convex = getConvexServerClient();
+					let projectCustomPrompt: string | undefined;
+					let projectDefaultModel: string | undefined;
 					if (threadId) {
 						if (!convex) {
 							throw new ChatError("internal:chat", {
@@ -179,6 +183,30 @@ export const Route = createFileRoute("/api/chat")({
 						}
 						effectiveUserId = ownerId;
 
+						// Project (folder) context: apply project-specific prompt/model.
+						const projectId = (thread as { projectId?: string } | null)
+							?.projectId;
+						if (projectId && convex) {
+							try {
+								const project = await convex.query(
+									convexApi.projects.getProject,
+									{
+										projectId: projectId as any,
+										userId: ownerId,
+									},
+								);
+								projectCustomPrompt = (
+									project as { customPrompt?: string } | null
+								)?.customPrompt;
+								projectDefaultModel = (
+									project as { defaultModel?: string } | null
+								)?.defaultModel;
+							} catch (e) {
+								console.error("[chat] failed to load project", e);
+							}
+						}
+						void projectCustomPrompt, void projectDefaultModel;
+
 						if (streamId) {
 							await convex.mutation(convexApi.threads.setThreadStreaming, {
 								threadId: threadId as any,
@@ -191,44 +219,65 @@ export const Route = createFileRoute("/api/chat")({
 						effectiveUserId = sessionUserId;
 					}
 
-					if (body.apiKey && body.apiKey.trim()) {
-						apiKey = body.apiKey.trim();
-					}
+					// BYOK: load the signed-in user's encrypted provider config. Keys
+					// never travel through the browser for chat requests.
+					const { getDecryptedUserSettings } = await import(
+						"#/lib/user-settings.server"
+					);
+					const secrets = await getDecryptedUserSettings(sessionUserId);
+					const apiKey = secrets.geminiKey;
 					if (!apiKey) {
 						throw new ChatError("internal:api", {
-							cause: "No Gemini API key configured. Set GEMINI_API_KEY on the server or provide one in settings.",
+							cause:
+								"No Gemini API key configured. Add your key in Settings → AI Provider or finish onboarding.",
 						});
 					}
+					const memoryApiKey = body.memory
+						? (process.env.SUPERMEMORY_API_KEY?.trim() ?? null)
+						: null;
+					const searchConfig = secrets.search;
 
-					const model = body.model || "gemini-3.5-flash-lite";
+					const model =
+						body.model || projectDefaultModel || "gemini-3.5-flash-lite";
 					const messages = body.messages.map((m) => ({
 						role: m.role as "user" | "assistant" | "system",
 						content: String(m.content ?? ""),
 					}));
 
 					const google = createGoogle({ apiKey });
-					const wantsThinking =
+					const reasoningEffort = body.reasoningEffort ?? "medium";
+					const isThinkingModel =
 						/hydrogen|thinking|reason/i.test(model) ||
 						model.includes("gemini-2.5") ||
 						model.includes("gemini-3");
+					const wantsThinking = isThinkingModel && reasoningEffort !== "off";
 
-					// Supermemory proxy: intercepts every model call to inject
-					// relevant memories from past threads (namespace = one per end
-					// user) and saves the exchange after the stream completes.
-					// `id` groups each thread's turns into a single document.
-					// Falls back to the unwrapped model when no key is configured.
-					const wrappedModel = process.env.SUPERMEMORY_API_KEY
+					// Optional memory layer: only active when the user enabled it and the
+					// server has a Supermemory key configured via SUPERMEMORY_API_KEY.
+					const wrappedModel = memoryApiKey
 						? withSupermemory(google(model), {
+								apiKey: memoryApiKey,
 								namespace: `user_${effectiveUserId}`,
 								id: threadId || streamId || "ephemeral",
 								mode: "full",
 							})
 						: google(model);
 
-					// Web search tool (opt-in from the client's globe toggle).
-					const tools = body.webSearch
-						? { web_search: createWebSearchTool() }
-						: undefined;
+					// Web search tool (opt-in from the client's globe toggle). The
+					// provider and key come from the user's saved BYOK settings.
+					const tools =
+						body.webSearch && searchConfig
+							? {
+									web_search: createWebSearchTool(
+										searchConfig.provider,
+										searchConfig.apiKey,
+									),
+								}
+							: undefined;
+
+					const baseSystem = projectCustomPrompt
+						? `${projectCustomPrompt}\n\n${WEB_SEARCH_SYSTEM_PROMPT}`
+						: WEB_SEARCH_SYSTEM_PROMPT;
 
 					const result = streamText({
 						model: wrappedModel,
@@ -238,7 +287,7 @@ export const Route = createFileRoute("/api/chat")({
 									tools,
 									// Allow the model to continue after tool results.
 									stopWhen: isStepCount(10),
-									system: WEB_SEARCH_SYSTEM_PROMPT,
+									system: baseSystem,
 								}
 							: {}),
 						...(wantsThinking
@@ -247,6 +296,12 @@ export const Route = createFileRoute("/api/chat")({
 										google: {
 											thinkingConfig: {
 												includeThoughts: true,
+												thinkingBudget:
+													reasoningEffort === "low"
+														? 1000
+														: reasoningEffort === "medium"
+															? 6000
+															: 12000,
 											},
 										},
 									},
@@ -401,7 +456,7 @@ export const Route = createFileRoute("/api/chat")({
 							);
 							if (resumable) {
 								// resumable-stream yields string chunks; encode to bytes for
-								// the HTTP response (same as intern3-chat's POST route).
+								// the HTTP response.
 								return new Response(
 									resumable.pipeThrough(new TextEncoderStream()),
 									{ headers },

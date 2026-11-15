@@ -207,8 +207,8 @@ From `tricodex/c3chat` (Convex + optional Redis):
 - **Redis cache** (optional): viewport of 50 messages; reduces Convex reads
   ~80% on thread switch; falls back if unavailable.
 - **Multi-tab**: Convex handles cross-tab sync automatically via WebSocket.
-- **API keys**: encrypted client-side (AES-GCM) in localStorage; per-user
-  isolation.
+- **API keys**: encrypted server-side (AES-256-GCM) in Postgres and scoped to
+  the signed-in user; plaintext keys never reach the browser.
 
 The lesson: **start with Convex-native sync. Add Redis only after measuring
 read costs.** Premature Redis = two sources of truth to keep consistent.
@@ -228,8 +228,8 @@ Files changed:
   with `useMutation`, AI reply via server function.
 - `src/components/chat/chat-home.tsx` — creates a thread on first submit and
   navigates to it.
-- `src/lib/ai.functions.ts` — server function calling Gemini with
-  `GEMINI_API_KEY`.
+- `src/lib/ai.functions.ts` — server function calling Gemini with the
+  signed-in user's encrypted BYOK key.
 
 Data flow (the sync engine in action):
 ```
@@ -254,8 +254,9 @@ Every step after the mutation is automatic. That is the sync engine.
 
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are not required. The codebase already
   conditionally registers social/OAuth providers and treats AI keys as optional.
-- Set `GEMINI_API_KEY` in `.env.local` (server-side) for the server function,
-  OR use a client-side key for direct browser calls (less secure; OK for dev).
+- Gemini is bring-your-own-key: users paste their key during onboarding or in
+  Settings → AI Provider. It is encrypted server-side and never sent back to the
+  browser, so no `GEMINI_API_KEY` environment variable is needed.
 - Pick a free-tier model: `gemini-3.5-flash-lite` is the cheapest/fastest and
   has a free tier. `gemini-3.8-flash` for better quality.
 

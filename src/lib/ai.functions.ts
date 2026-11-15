@@ -1,7 +1,9 @@
 import { createGoogle } from "@ai-sdk/google";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import { generateText } from "ai";
 
+import { auth } from "#/lib/auth";
 import { ChatError } from "#/lib/errors";
 
 interface GenerateReplyInput {
@@ -14,10 +16,27 @@ interface GenerateTitleInput {
 	model?: string;
 }
 
+/**
+ * Loads the signed-in user's Gemini key from encrypted server storage. Provider
+ * keys never travel through the browser for model calls.
+ */
+async function resolveGeminiKey(): Promise<string | null> {
+	const session = await auth.api
+		.getSession({ headers: getRequestHeaders() })
+		.catch(() => null);
+	const userId = session?.user?.id;
+	if (!userId) return null;
+	const { getDecryptedUserSettings } = await import(
+		"#/lib/user-settings.server"
+	);
+	const secrets = await getDecryptedUserSettings(userId);
+	return secrets.geminiKey;
+}
+
 export const generateTitle = createServerFn({ method: "POST" })
 	.validator((data: GenerateTitleInput) => data)
 	.handler(async ({ data }) => {
-		const apiKey = process.env.GEMINI_API_KEY;
+		const apiKey = await resolveGeminiKey();
 		const fallback = data.message
 			.trim()
 			.split(/\s+/)
@@ -65,10 +84,11 @@ export const generateTitle = createServerFn({ method: "POST" })
 export const generateReply = createServerFn({ method: "POST" })
 	.validator((data: GenerateReplyInput) => data)
 	.handler(async ({ data }) => {
-		const apiKey = process.env.GEMINI_API_KEY;
+		const apiKey = await resolveGeminiKey();
 		if (!apiKey) {
 			throw new ChatError("internal:api", {
-				cause: "GEMINI_API_KEY is not set on the server.",
+				cause:
+					"No Gemini API key configured. Add your key in Settings → AI Provider or finish onboarding.",
 			});
 		}
 

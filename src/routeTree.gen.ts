@@ -22,6 +22,7 @@ import { Route as SettingsAppearanceRouteImport } from './routes/settings/appear
 import { Route as SettingsFeaturesRouteImport } from './routes/settings/features'
 import { Route as SettingsModelsRouteImport } from './routes/settings/models'
 import { Route as SettingsProfileRouteImport } from './routes/settings/profile'
+import { Route as SettingsWebSearchRouteImport } from './routes/settings/web-search'
 import { Route as ChatThreadThreadIdRouteImport } from './routes/_chat.thread.$threadId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiPhrSplatRouteImport } from './routes/api/phr/$'
@@ -98,6 +99,11 @@ const SettingsUsageLazyRoute = SettingsUsageLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/settings/usage.lazy').then((d) => d.Route),
 )
+const SettingsWebSearchRoute = SettingsWebSearchRouteImport.update({
+  id: '/web-search',
+  path: '/web-search',
+  getParentRoute: () => SettingsRouteLazyRoute,
+} as any)
 const ChatThreadThreadIdRoute = ChatThreadThreadIdRouteImport.update({
   id: '/thread/$threadId',
   path: '/thread/$threadId',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/': typeof ChatIndexRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/thread/$threadId': typeof ChatThreadThreadIdRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/settings/features'
     | '/settings/models'
     | '/settings/profile'
+    | '/settings/web-search'
     | '/settings/usage'
     | '/thread/$threadId'
     | '/api/auth/$'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/settings/features'
     | '/settings/models'
     | '/settings/profile'
+    | '/settings/web-search'
     | '/settings/usage'
     | '/'
     | '/thread/$threadId'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/settings/features'
     | '/settings/models'
     | '/settings/profile'
+    | '/settings/web-search'
     | '/settings/usage'
     | '/_chat/'
     | '/_chat/thread/$threadId'
@@ -335,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsUsageLazyRouteImport
       parentRoute: typeof SettingsRouteLazyRoute
     }
+    '/settings/web-search': {
+      id: '/settings/web-search'
+      path: '/web-search'
+      fullPath: '/settings/web-search'
+      preLoaderRoute: typeof SettingsWebSearchRouteImport
+      parentRoute: typeof SettingsRouteLazyRoute
+    }
     '/_chat/thread/$threadId': {
       id: '/_chat/thread/$threadId'
       path: '/thread/$threadId'
@@ -387,6 +406,7 @@ interface SettingsRouteLazyRouteChildren {
   SettingsFeaturesRoute: typeof SettingsFeaturesRoute
   SettingsModelsRoute: typeof SettingsModelsRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
+  SettingsWebSearchRoute: typeof SettingsWebSearchRoute
   SettingsUsageLazyRoute: typeof SettingsUsageLazyRoute
 }
 
@@ -397,6 +417,7 @@ const SettingsRouteLazyRouteChildren: SettingsRouteLazyRouteChildren = {
   SettingsFeaturesRoute: SettingsFeaturesRoute,
   SettingsModelsRoute: SettingsModelsRoute,
   SettingsProfileRoute: SettingsProfileRoute,
+  SettingsWebSearchRoute: SettingsWebSearchRoute,
   SettingsUsageLazyRoute: SettingsUsageLazyRoute,
 }
 

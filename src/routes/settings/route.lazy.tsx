@@ -13,19 +13,21 @@ import {
 	Globe,
 	Key,
 	PaintBucket,
+	Search,
 	User,
 } from "lucide-react";
 import * as React from "react";
+import { RouteErrorComponent } from "#/components/route-error";
 import { SettingsLayout } from "#/components/settings/settings-layout";
 import { Button } from "#/components/ui/button";
 import { Skeleton } from "#/components/ui/skeleton";
 import { useSession } from "#/hooks/auth-hooks";
-import { RouteErrorComponent } from "#/components/route-error";
 import { cn } from "#/lib/utils";
 
 const settingsNavItems = [
 	{ title: "Profile", href: "/settings/profile", icon: User },
-	{ title: "API Keys", href: "/settings/api-keys", icon: Key },
+	{ title: "AI Provider", href: "/settings/api-keys", icon: Key },
+	{ title: "Web Search", href: "/settings/web-search", icon: Search },
 	{ title: "Models", href: "/settings/models", icon: Box },
 	{ title: "AI Options", href: "/settings/ai-options", icon: Bot },
 	{ title: "Features", href: "/settings/features", icon: Globe },
