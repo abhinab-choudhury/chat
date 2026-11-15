@@ -1,4 +1,5 @@
 import { createGoogle } from "@ai-sdk/google";
+import { withSupermemory } from "@supermemory/tools/ai-sdk";
 import { createFileRoute } from "@tanstack/react-router";
 import { isStepCount, streamText, tool } from "ai";
 import { z } from "zod";
@@ -11,7 +12,7 @@ import { SearchProvider } from "#/lib/search/search-provider";
 import {
 	summarizeResults,
 	type WebSearchToolCall,
-	type WebSearchToolData
+	type WebSearchToolData,
 } from "#/lib/search/types";
 
 type ChatBody = {
@@ -114,13 +115,10 @@ export const Route = createFileRoute("/api/chat")({
 						.getSession({ headers: request.headers })
 						.catch(() => null);
 					if (!earlySession?.user?.id) {
-						return new Response(
-							JSON.stringify({ message: "Unauthorized" }),
-							{
-								status: 401,
-								headers: { "Content-Type": "application/json" },
-							},
-						);
+						return new Response(JSON.stringify({ message: "Unauthorized" }), {
+							status: 401,
+							headers: { "Content-Type": "application/json" },
+						});
 					}
 					const apiKey = process.env.GEMINI_API_KEY;
 					if (!apiKey) {
@@ -158,13 +156,10 @@ export const Route = createFileRoute("/api/chat")({
 						.catch(() => null);
 					const sessionUserId = session?.user?.id as string | undefined;
 					if (!sessionUserId) {
-						return new Response(
-							JSON.stringify({ message: "Unauthorized" }),
-							{
-								status: 401,
-								headers: { "Content-Type": "application/json" },
-							},
-						);
+						return new Response(JSON.stringify({ message: "Unauthorized" }), {
+							status: 401,
+							headers: { "Content-Type": "application/json" },
+						});
 					}
 					const convex = getConvexServerClient();
 					if (threadId) {
@@ -212,13 +207,26 @@ export const Route = createFileRoute("/api/chat")({
 						model.includes("gemini-2.5") ||
 						model.includes("gemini-3");
 
+					// Supermemory proxy: intercepts every model call to inject
+					// relevant memories from past threads (namespace = one per end
+					// user) and saves the exchange after the stream completes.
+					// `id` groups each thread's turns into a single document.
+					// Falls back to the unwrapped model when no key is configured.
+					const wrappedModel = process.env.SUPERMEMORY_API_KEY
+						? withSupermemory(google(model), {
+								namespace: `user_${effectiveUserId}`,
+								id: threadId || streamId || "ephemeral",
+								mode: "full",
+							})
+						: google(model);
+
 					// Web search tool (opt-in from the client's globe toggle).
 					const tools = body.webSearch
 						? { web_search: createWebSearchTool() }
 						: undefined;
 
 					const result = streamText({
-						model: google(model),
+						model: wrappedModel,
 						messages,
 						...(tools
 							? {
@@ -266,17 +274,20 @@ export const Route = createFileRoute("/api/chat")({
 												enqueue({ t: "t", d: delta });
 											}
 										} else if (part.type === "tool-call") {
-											const { input } = part as unknown as {
+											const { toolCallId, input } = part as unknown as {
+												toolCallId?: string;
 												input?: { query?: string };
 											};
 											const call: WebSearchToolCall = {
+												id: toolCallId,
 												query: input?.query ?? "",
 												state: "loading",
 											};
 											webSearchToolCalls.push(call);
 											enqueue({ t: "tool", d: JSON.stringify(call) });
 										} else if (part.type === "tool-result") {
-											const { input, output } = part as unknown as {
+											const { toolCallId, input, output } = part as unknown as {
+												toolCallId?: string;
 												input?: { query?: string };
 												output?: {
 													success?: boolean;
@@ -289,6 +300,7 @@ export const Route = createFileRoute("/api/chat")({
 												};
 											};
 											const call: WebSearchToolCall = {
+												id: toolCallId,
 												query: input?.query ?? "",
 												state: "done",
 												results: output?.success
@@ -296,11 +308,15 @@ export const Route = createFileRoute("/api/chat")({
 													: undefined,
 												error: output?.success ? undefined : output?.error,
 											};
-											// Merge into the matching pending call (same query).
+											// Merge into the matching pending call (by id, else query).
 											let pendingIndex = -1;
 											for (let i = webSearchToolCalls.length - 1; i >= 0; i--) {
 												const pending = webSearchToolCalls[i];
-												if (pending.state === "loading" && pending.query === call.query) {
+												if (
+													pending.state === "loading" &&
+													pending.query === call.query &&
+													(!call.id || pending.id === call.id)
+												) {
 													pendingIndex = i;
 													break;
 												}
@@ -398,9 +414,12 @@ export const Route = createFileRoute("/api/chat")({
 
 					// No resumable context: stream directly to this client, but producer is
 					// independently drained above so generation/finalization continues on disconnect.
-					return new Response(clientStream.pipeThrough(new TextEncoderStream()), {
-						headers,
-					});
+					return new Response(
+						clientStream.pipeThrough(new TextEncoderStream()),
+						{
+							headers,
+						},
+					);
 				} catch (error) {
 					if (threadMarkedLive && !finalized) {
 						const convex = getConvexServerClient();

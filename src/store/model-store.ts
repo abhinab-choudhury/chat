@@ -28,6 +28,10 @@ export interface ModelStoreState {
 	reasoningEffort: ReasoningEffort;
 	enabledTools: string[];
 	toolsEnabled: boolean;
+	webSearchEnabled: boolean;
+	webSearchLimit: number;
+	webSearchScrape: boolean;
+	memoryEnabled: boolean;
 	defaultMcpOverrides: Record<string, boolean>;
 	mcpOverrides: McpOverrides;
 }
@@ -39,6 +43,10 @@ export interface ModelStoreActions {
 	setEnabledTools: (tools: string[]) => void;
 	toggleTool: (tool: string) => void;
 	setToolsEnabled: (enabled: boolean) => void;
+	setWebSearchEnabled: (enabled: boolean) => void;
+	setWebSearchLimit: (limit: number) => void;
+	setWebSearchScrape: (scrape: boolean) => void;
+	setMemoryEnabled: (enabled: boolean) => void;
 	setDefaultMcpOverride: (server: string, enabled: boolean) => void;
 	setMcpOverride: (threadId: string, server: string, enabled: boolean) => void;
 	getMcpOverrides: (threadId: string) => Record<string, boolean>;
@@ -56,6 +64,10 @@ const initialState: ModelStoreState = {
 	reasoningEffort: DEFAULT_REASONING_EFFORT,
 	enabledTools: [],
 	toolsEnabled: true,
+	webSearchEnabled: true,
+	webSearchLimit: 5,
+	webSearchScrape: true,
+	memoryEnabled: true,
 	defaultMcpOverrides: {},
 	mcpOverrides: {},
 };
@@ -81,6 +93,11 @@ export const useModelStore = create<ModelStore>()(
 				})),
 
 			setToolsEnabled: (toolsEnabled) => set({ toolsEnabled }),
+
+			setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
+			setWebSearchLimit: (webSearchLimit) => set({ webSearchLimit }),
+			setWebSearchScrape: (webSearchScrape) => set({ webSearchScrape }),
+			setMemoryEnabled: (memoryEnabled) => set({ memoryEnabled }),
 
 			setDefaultMcpOverride: (server, enabled) =>
 				set((state) => ({
@@ -132,6 +149,10 @@ export const useModelStore = create<ModelStore>()(
 				reasoningEffort: state.reasoningEffort,
 				enabledTools: state.enabledTools,
 				toolsEnabled: state.toolsEnabled,
+				webSearchEnabled: state.webSearchEnabled,
+				webSearchLimit: state.webSearchLimit,
+				webSearchScrape: state.webSearchScrape,
+				memoryEnabled: state.memoryEnabled,
 				defaultMcpOverrides: state.defaultMcpOverrides,
 				mcpOverrides: state.mcpOverrides,
 			}),

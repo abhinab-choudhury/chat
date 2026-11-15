@@ -36,6 +36,8 @@ export interface WebSearchResultSummary {
 
 /** One web_search tool invocation, as streamed to the client and persisted. */
 export interface WebSearchToolCall {
+	/** AI SDK toolCallId, when known. */
+	id?: string;
 	query: string;
 	state: "loading" | "done";
 	results?: WebSearchResultSummary[];

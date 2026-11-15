@@ -8,15 +8,16 @@ import {
 	RotateCcwIcon,
 } from "lucide-react";
 import * as React from "react";
-import { MemoizedMarkdown } from "#/components/memoized-markdown";
 import { assistantProseClass } from "#/components/chat/prose";
+import { WebSearchResults } from "#/components/chat/web-search-results";
+import { MemoizedMarkdown } from "#/components/memoized-markdown";
+import { Button } from "#/components/ui/button";
+import { Message, MessageContent } from "#/components/ui/message";
+import { MessageScrollerItem } from "#/components/ui/message-scroller";
 import type { ChatMessage } from "#/hooks/use-thread-chat";
 import { cn } from "#/lib/utils";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Button } from "#/components/ui/button";
-import { Message, MessageContent } from "#/components/ui/message";
-import { MessageScrollerItem } from "#/components/ui/message-scroller";
 
 interface ChatMessageItemProps {
 	message: ChatMessage;
@@ -112,6 +113,10 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 									: "select-text w-full text-sm"
 							}
 						>
+							{isAssistant &&
+								(message.toolData?.webSearches ?? []).map((call) => (
+									<WebSearchResults key={call.id ?? call.query} call={call} />
+								))}
 							{isAssistant && message.reasoning ? (
 								<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
 									<button

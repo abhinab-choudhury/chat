@@ -1,7 +1,7 @@
 import { ChevronDown, ExternalLink, Globe, Loader2 } from "lucide-react";
 import * as React from "react";
-import { cn } from "#/lib/utils";
 import type { WebSearchToolCall } from "#/lib/search/types";
+import { cn } from "#/lib/utils";
 
 function getFaviconUrl(url: string): string {
 	try {
@@ -76,9 +76,7 @@ export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 					)}
 					<span className="font-medium text-primary">Web Search</span>
 					{call.error ? (
-						<span className="text-muted-foreground text-xs">
-							{call.error}
-						</span>
+						<span className="text-muted-foreground text-xs">{call.error}</span>
 					) : null}
 					<div className="flex-1 md:hidden" />
 					{hasResults && (
@@ -125,18 +123,16 @@ export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 			{expanded && hasResults ? (
 				<div className="my-4 overflow-hidden rounded-lg border bg-muted/50">
 					<div className="flex gap-4 overflow-x-auto p-4">
-						{results.map((result, index) => (
+						{results.map((result) => (
 							<button
-								key={`${result.url}-${index}`}
+								key={result.url || result.title}
 								type="button"
 								className={cn(
 									"group relative flex-shrink-0 overflow-hidden rounded-lg border bg-card text-left",
 									"transition-all duration-200 hover:border-primary/20 hover:bg-accent/50 hover:shadow-lg",
 									"w-64 min-w-64",
 								)}
-								onClick={() =>
-									result.url && window.open(result.url, "_blank")
-								}
+								onClick={() => result.url && window.open(result.url, "_blank")}
 								aria-label={`Open ${result.title} in new tab`}
 							>
 								{result.url ? (
@@ -165,9 +161,7 @@ export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 									{result.url ? (
 										<div className="flex items-center gap-1.5 border-border/50 border-t pt-2">
 											<span className="flex-1 truncate text-muted-foreground/70 text-xs">
-												{result.url
-													.replace(/^(https?:\/\/)/, "")
-													.split("/")[0]}
+												{result.url.replace(/^(https?:\/\/)/, "").split("/")[0]}
 											</span>
 											<ExternalLink className="size-3 flex-shrink-0 text-muted-foreground/50" />
 										</div>

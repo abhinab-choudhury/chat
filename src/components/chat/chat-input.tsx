@@ -1,4 +1,4 @@
-import { SendIcon } from "lucide-react";
+import { GlobeIcon, SendIcon } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "#/components/ui/button";
@@ -10,6 +10,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "#/components/ui/select";
+import { cn } from "#/lib/utils";
+import { useModelStore } from "#/store/model-store";
 
 interface ChatModel {
 	id: string;
@@ -56,6 +58,16 @@ export function ChatInput({
 	};
 	const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
+	// Web search toggle lives in the model store so it persists across the
+	// home screen and thread views (master-gated by Settings > AI Options).
+	const toolsEnabled = useModelStore((s) => s.toolsEnabled);
+	const webSearchEnabled = useModelStore((s) =>
+		s.enabledTools.includes("web_search"),
+	);
+	const toggleWebSearch = useModelStore((s) => s.toggleTool);
+	const reasoningEffort = useModelStore((s) => s.reasoningEffort);
+	const setReasoningEffort = useModelStore((s) => s.setReasoningEffort);
+
 	const resize = React.useCallback(() => {
 		const el = textareaRef.current;
 		if (!el) return;
@@ -88,17 +100,60 @@ export function ChatInput({
 				className="max-h-30 min-h-15 w-full resize-none border-0 bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 			/>
 			<div className="mt-1 flex items-center justify-between gap-2">
-				<span className="text-xs text-muted-foreground">
-					<KbdGroup>
-						<Kbd>Enter</Kbd>
-					</KbdGroup>{" "}
-					to send,{" "}
-					<KbdGroup>
-						<Kbd>Shift</Kbd>+<Kbd>Enter</Kbd>
-					</KbdGroup>{" "}
-					for new line
-				</span>
+				<div className="flex items-center gap-2">
+					<Button
+						type="button"
+						size="icon"
+						variant="ghost"
+						aria-label={
+							webSearchEnabled ? "Disable web search" : "Enable web search"
+						}
+						title={
+							toolsEnabled
+								? webSearchEnabled
+									? "Web search enabled"
+									: "Enable web search"
+								: "Enable tools in Settings > AI Options first"
+						}
+						disabled={disabled || !toolsEnabled}
+						className={cn(
+							"size-8 shrink-0 rounded-xl",
+							webSearchEnabled &&
+								"bg-primary text-primary-foreground hover:bg-primary/90",
+						)}
+						onClick={() => toggleWebSearch("web_search")}
+					>
+						<GlobeIcon className="size-4" />
+					</Button>
+					<span className="text-xs text-muted-foreground">
+						<KbdGroup>
+							<Kbd>Enter</Kbd>
+						</KbdGroup>{" "}
+						to send,{" "}
+						<KbdGroup>
+							<Kbd>Shift</Kbd>+<Kbd>Enter</Kbd>
+						</KbdGroup>{" "}
+						for new line
+					</span>
+				</div>
 				<div className="flex flex-row gap-2">
+					<Select
+						value={reasoningEffort}
+						onValueChange={(v) =>
+							setReasoningEffort(v as "off" | "low" | "medium" | "high")
+						}
+						disabled={disabled}
+					>
+						<SelectTrigger className="h-9 w-24 sm:w-28 rounded-xl text-xs font-medium">
+							<SelectValue placeholder="Reasoning" />
+						</SelectTrigger>
+						<SelectContent className="mb-10">
+							<SelectItem value="off">Off</SelectItem>
+							<SelectItem value="low">Low</SelectItem>
+							<SelectItem value="medium">Medium</SelectItem>
+							<SelectItem value="high">High</SelectItem>
+						</SelectContent>
+					</Select>
 					<Select
 						value={selectedModel}
 						onValueChange={handleModelChange}

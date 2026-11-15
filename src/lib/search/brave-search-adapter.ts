@@ -2,7 +2,7 @@ import type {
 	SearchAdapter,
 	SearchAdapterConfig,
 	SearchOptions,
-	SearchResult
+	SearchResult,
 } from "./types";
 
 interface BraveSearchResponse {

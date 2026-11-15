@@ -21,14 +21,18 @@ interface ChatStreamEvent {
 }
 
 /** Merge a tool event into the accumulated list: a "done" call replaces its
- * matching pending "loading" call (same query); anything else is appended. */
+ * matching pending call (by toolCallId when present, else same query);
+ * anything else is appended. */
 function mergeToolCall(
 	calls: WebSearchToolCall[],
 	call: WebSearchToolCall,
 ): WebSearchToolCall[] {
 	if (call.state === "done") {
 		const index = calls.findIndex(
-			(c) => c.state === "loading" && c.query === call.query,
+			(c) =>
+				c.state === "loading" &&
+				c.query === call.query &&
+				(!call.id || c.id === call.id),
 		);
 		if (index !== -1) {
 			const next = [...calls];

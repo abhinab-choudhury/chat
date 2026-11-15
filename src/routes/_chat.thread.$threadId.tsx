@@ -46,6 +46,7 @@ function RouteComponent() {
 		pendingAutoSend,
 		streamingText,
 		streamingReasoning,
+		streamingToolCalls,
 		selectedModel,
 		setSelectedModel,
 		handleSubmit,
@@ -98,10 +99,14 @@ function RouteComponent() {
 	}
 
 	const isStreaming = Boolean(
-		(busy || pendingAutoSend) && (streamingReasoning || streamingText),
+		(busy || pendingAutoSend) &&
+			(streamingReasoning || streamingText || streamingToolCalls.length > 0),
 	);
 	const isThinkingOnly = Boolean(
-		(busy || pendingAutoSend) && !streamingText && !streamingReasoning,
+		(busy || pendingAutoSend) &&
+			!streamingText &&
+			!streamingReasoning &&
+			streamingToolCalls.length === 0,
 	);
 
 	return (
@@ -121,6 +126,7 @@ function RouteComponent() {
 								<StreamingMessage
 									streamingText={streamingText}
 									streamingReasoning={streamingReasoning}
+									streamingToolCalls={streamingToolCalls}
 								/>
 							) : null}
 							{isThinkingOnly ? (

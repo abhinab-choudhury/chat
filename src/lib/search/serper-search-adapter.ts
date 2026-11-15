@@ -2,7 +2,7 @@ import type {
 	SearchAdapter,
 	SearchAdapterConfig,
 	SearchOptions,
-	SearchResult
+	SearchResult,
 } from "./types";
 
 interface SerperSearchResponse {
@@ -101,8 +101,7 @@ export class SerperSearchAdapter implements SearchAdapter {
 		// Add knowledge graph as first result if available.
 		if (data.knowledgeGraph) {
 			results.unshift({
-				url:
-					data.knowledgeGraph.website || data.knowledgeGraph.descriptionLink,
+				url: data.knowledgeGraph.website || data.knowledgeGraph.descriptionLink,
 				title: data.knowledgeGraph.title,
 				description: data.knowledgeGraph.description,
 			});

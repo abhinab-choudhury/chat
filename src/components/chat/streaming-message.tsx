@@ -1,22 +1,26 @@
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import * as React from "react";
-import { MemoizedMarkdown } from "#/components/memoized-markdown";
 import { assistantProseClass } from "#/components/chat/prose";
+import { WebSearchResults } from "#/components/chat/web-search-results";
+import { MemoizedMarkdown } from "#/components/memoized-markdown";
 import { Message, MessageContent } from "#/components/ui/message";
 import { MessageScrollerItem } from "#/components/ui/message-scroller";
+import type { WebSearchToolCall } from "#/lib/search/types";
 
 interface StreamingMessageProps {
 	streamingText: string;
 	streamingReasoning: string;
+	streamingToolCalls?: WebSearchToolCall[];
 }
 
 /**
  * The live, in-progress assistant bubble: streaming reasoning ("Thinking")
- * and streaming text with a blinking caret.
+ * and streaming text with a blinking caret, plus live web-search activity.
  */
 export function StreamingMessage({
 	streamingText,
 	streamingReasoning,
+	streamingToolCalls,
 }: StreamingMessageProps) {
 	const [thinkingOpen, setThinkingOpen] = React.useState(false);
 
@@ -25,8 +29,14 @@ export function StreamingMessage({
 			messageId="__streaming__"
 			className="flex w-full justify-start"
 		>
-			<Message align="start" className="w-full max-w-none flex-col items-start gap-1">
+			<Message
+				align="start"
+				className="w-full max-w-none flex-col items-start gap-1"
+			>
 				<MessageContent className="select-text w-full text-sm">
+					{(streamingToolCalls ?? []).map((call) => (
+						<WebSearchResults key={call.id ?? call.query} call={call} />
+					))}
 					{streamingReasoning ? (
 						<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
 							<button

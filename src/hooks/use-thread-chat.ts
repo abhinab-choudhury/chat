@@ -6,8 +6,8 @@ import {
 	readCachedMessages,
 	writeCachedMessages,
 } from "#/lib/local-chat-cache";
+import type { WebSearchToolCall, WebSearchToolData } from "#/lib/search/types";
 import { consumeChatStream } from "#/lib/stream-reader";
-import type { WebSearchToolData, WebSearchToolCall } from "#/lib/search/types";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
@@ -86,12 +86,14 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 						role: string;
 						content: string;
 						reasoning?: string;
+						toolData?: WebSearchToolData;
 						createdAt?: number;
 					}) => ({
 						_id: String(m._id),
 						role: m.role,
 						content: m.content,
 						reasoning: m.reasoning,
+						toolData: m.toolData,
 						createdAt: m.createdAt,
 					}),
 				),
@@ -115,6 +117,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 						threadId: args.threadId,
 						role: args.role,
 						content: args.content,
+						reasoning: args.reasoning,
+						toolData: args.toolData,
 						authorId: args.authorId ?? args.userId,
 						clientUuid: args.clientUuid,
 						createdAt: Date.now(),
@@ -323,6 +327,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			send,
 			threadId,
 			selectedModel,
+			webSearchEnabled,
 			setBusy,
 			setInput,
 			isOwner,
@@ -422,12 +427,14 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			role: string;
 			content: string;
 			reasoning?: string;
+			toolData?: WebSearchToolData;
 		}>;
 		const list: ChatMessage[] = source.map((m) => ({
 			_id: String(m._id),
 			role: m.role,
 			content: m.content,
 			reasoning: m.reasoning,
+			toolData: m.toolData,
 		}));
 		if (
 			pendingInitialMessage &&
@@ -459,6 +466,9 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		pendingAutoSend,
 		streamingText,
 		streamingReasoning,
+		streamingToolCalls,
+		webSearchEnabled,
+		toggleWebSearch,
 		selectedModel,
 		setSelectedModel,
 		handleSubmit,

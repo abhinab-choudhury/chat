@@ -10,6 +10,7 @@ import {
 	BarChart3,
 	Bot,
 	Box,
+	Globe,
 	PaintBucket,
 	User,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const settingsNavItems = [
 	{ title: "Profile", href: "/settings/profile", icon: User },
 	{ title: "Models", href: "/settings/models", icon: Box },
 	{ title: "AI Options", href: "/settings/ai-options", icon: Bot },
+	{ title: "Features", href: "/settings/features", icon: Globe },
 	{ title: "Usage", href: "/settings/usage", icon: BarChart3 },
 	{ title: "Appearance", href: "/settings/appearance", icon: PaintBucket },
 ];

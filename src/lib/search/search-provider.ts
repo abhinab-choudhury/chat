@@ -6,7 +6,7 @@ import type {
 	SearchAdapter,
 	SearchOptions,
 	SearchProviderType,
-	SearchResult
+	SearchResult,
 } from "./types";
 
 // Server-side API keys; the first configured provider is used unless
@@ -63,8 +63,7 @@ export class SearchProvider {
 	private adapter: SearchAdapter;
 
 	constructor(provider?: SearchProviderType) {
-		const resolved =
-			provider ?? getServerSearchProviderType();
+		const resolved = provider ?? getServerSearchProviderType();
 		if (!resolved) {
 			throw new Error(
 				"No web search provider configured. Set one of TAVILY_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY or SERPER_API_KEY (or SEARCH_PROVIDER) on the server.",
