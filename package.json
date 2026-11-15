@@ -6,9 +6,9 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "concurrently -n web,convex -c cyan,magenta --kill-others-on-fail \"npm:dev:web\" \"npm:dev:convex\"",
+    "dev:web": "vite dev --port 3000",
     "dev:convex": "convex dev",
-    "dev:all": "trap 'kill 0' EXIT; vite dev --port 3000 & convex dev & wait",
     "generate-routes": "vite build",
     "build": "vite build",
     "preview": "vite preview",
@@ -54,6 +54,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
+    "concurrently": "^10.0.7",
     "convex": "^1.32.0",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
@@ -72,6 +73,7 @@
     "radix-ui": "^1.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-is": "^19.3.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
     "resumable-stream": "^2.2.13",
