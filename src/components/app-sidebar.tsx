@@ -11,6 +11,7 @@ import {
 	UserIcon,
 } from "lucide-react";
 import * as React from "react";
+import { Logo, LogoSymbol } from "#/components/logo";
 import { RenameThreadDialog } from "#/components/thread/rename-thread-dialog";
 import { Button } from "#/components/ui/button";
 import { Kbd, KbdGroup } from "#/components/ui/kbd";
@@ -97,8 +98,12 @@ export function AppSidebar() {
 		<Sidebar collapsible="offcanvas">
 			<SidebarHeader className="flex flex-col gap-2 px-2 py-3">
 				{!collapsed ? (
-					<div className="mx-1.5 text-3xl font-bold">.Chat</div>
-				) : null}
+					<Logo className="mx-1.5" />
+				) : (
+					<div className="flex justify-center">
+						<LogoSymbol />
+					</div>
+				)}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>

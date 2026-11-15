@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import * as React from "react";
+import { LogoSymbol } from "#/components/logo";
 import { Message, MessageContent } from "#/components/ui/message";
 import {
 	MessageScroller,
@@ -26,10 +27,13 @@ import {
 } from "./suggested-questions";
 
 const AUTH_QUESTIONS = [
-  { id: "a1", label: "Create a 7-day launch email sequence for a SaaS app" },
-  { id: "a2", label: "Create a SQL schema for a multi-vendor marketplace" },
-  { id: "a3", label: "Create a 4-week beginner half-marathon training plan" },
-  { id: "a4", label: "Create a 60-second YouTube Short script on noise cancellation" },
+	{ id: "a1", label: "Create a 7-day launch email sequence for a SaaS app" },
+	{ id: "a2", label: "Create a SQL schema for a multi-vendor marketplace" },
+	{ id: "a3", label: "Create a 4-week beginner half-marathon training plan" },
+	{
+		id: "a4",
+		label: "Create a 60-second YouTube Short script on noise cancellation",
+	},
 ];
 
 export function ChatHome() {
@@ -221,6 +225,7 @@ export function ChatHome() {
 					<>
 						<div className="text-left">
 							<div className="flex items-center gap-3">
+								<LogoSymbol className="size-9" />
 								<div>
 									<h1 className="text-xl font-bold tracking-tight sm:text-2xl">
 										{isAuthenticated
