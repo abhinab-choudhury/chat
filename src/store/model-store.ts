@@ -32,6 +32,8 @@ export interface ModelStoreState {
 	webSearchLimit: number;
 	webSearchScrape: boolean;
 	memoryEnabled: boolean;
+	geminiApiKey: string;
+	onboardingCompleted: boolean;
 	defaultMcpOverrides: Record<string, boolean>;
 	mcpOverrides: McpOverrides;
 }
@@ -47,6 +49,8 @@ export interface ModelStoreActions {
 	setWebSearchLimit: (limit: number) => void;
 	setWebSearchScrape: (scrape: boolean) => void;
 	setMemoryEnabled: (enabled: boolean) => void;
+	setGeminiApiKey: (key: string) => void;
+	setOnboardingCompleted: (done: boolean) => void;
 	setDefaultMcpOverride: (server: string, enabled: boolean) => void;
 	setMcpOverride: (threadId: string, server: string, enabled: boolean) => void;
 	getMcpOverrides: (threadId: string) => Record<string, boolean>;
@@ -68,6 +72,8 @@ const initialState: ModelStoreState = {
 	webSearchLimit: 5,
 	webSearchScrape: true,
 	memoryEnabled: true,
+	geminiApiKey: "",
+	onboardingCompleted: false,
 	defaultMcpOverrides: {},
 	mcpOverrides: {},
 };
@@ -98,6 +104,8 @@ export const useModelStore = create<ModelStore>()(
 			setWebSearchLimit: (webSearchLimit) => set({ webSearchLimit }),
 			setWebSearchScrape: (webSearchScrape) => set({ webSearchScrape }),
 			setMemoryEnabled: (memoryEnabled) => set({ memoryEnabled }),
+			setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey }),
+			setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
 
 			setDefaultMcpOverride: (server, enabled) =>
 				set((state) => ({
@@ -153,6 +161,8 @@ export const useModelStore = create<ModelStore>()(
 				webSearchLimit: state.webSearchLimit,
 				webSearchScrape: state.webSearchScrape,
 				memoryEnabled: state.memoryEnabled,
+				geminiApiKey: state.geminiApiKey,
+				onboardingCompleted: state.onboardingCompleted,
 				defaultMcpOverrides: state.defaultMcpOverrides,
 				mcpOverrides: state.mcpOverrides,
 			}),

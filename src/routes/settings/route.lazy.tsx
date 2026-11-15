@@ -11,6 +11,7 @@ import {
 	Bot,
 	Box,
 	Globe,
+	Key,
 	PaintBucket,
 	User,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import { cn } from "#/lib/utils";
 
 const settingsNavItems = [
 	{ title: "Profile", href: "/settings/profile", icon: User },
+	{ title: "API Keys", href: "/settings/api-keys", icon: Key },
 	{ title: "Models", href: "/settings/models", icon: Box },
 	{ title: "AI Options", href: "/settings/ai-options", icon: Bot },
 	{ title: "Features", href: "/settings/features", icon: Globe },

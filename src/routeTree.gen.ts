@@ -17,6 +17,7 @@ import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat.library'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as SettingsAiOptionsRouteImport } from './routes/settings/ai-options'
+import { Route as SettingsApiKeysRouteImport } from './routes/settings/api-keys'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings/appearance'
 import { Route as SettingsFeaturesRouteImport } from './routes/settings/features'
 import { Route as SettingsModelsRouteImport } from './routes/settings/models'
@@ -63,6 +64,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
 const SettingsAiOptionsRoute = SettingsAiOptionsRouteImport.update({
   id: '/ai-options',
   path: '/ai-options',
+  getParentRoute: () => SettingsRouteLazyRoute,
+} as any)
+const SettingsApiKeysRoute = SettingsApiKeysRouteImport.update({
+  id: '/api-keys',
+  path: '/api-keys',
   getParentRoute: () => SettingsRouteLazyRoute,
 } as any)
 const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/settings/ai-options': typeof SettingsAiOptionsRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/settings/ai-options': typeof SettingsAiOptionsRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/_chat/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/settings/ai-options': typeof SettingsAiOptionsRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/api/chat'
     | '/settings/ai-options'
+    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/api/chat'
     | '/settings/ai-options'
+    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/_chat/library'
     | '/api/chat'
     | '/settings/ai-options'
+    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
@@ -279,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-options'
       fullPath: '/settings/ai-options'
       preLoaderRoute: typeof SettingsAiOptionsRouteImport
+      parentRoute: typeof SettingsRouteLazyRoute
+    }
+    '/settings/api-keys': {
+      id: '/settings/api-keys'
+      path: '/api-keys'
+      fullPath: '/settings/api-keys'
+      preLoaderRoute: typeof SettingsApiKeysRouteImport
       parentRoute: typeof SettingsRouteLazyRoute
     }
     '/settings/appearance': {
@@ -363,6 +382,7 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface SettingsRouteLazyRouteChildren {
   SettingsAiOptionsRoute: typeof SettingsAiOptionsRoute
+  SettingsApiKeysRoute: typeof SettingsApiKeysRoute
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
   SettingsFeaturesRoute: typeof SettingsFeaturesRoute
   SettingsModelsRoute: typeof SettingsModelsRoute
@@ -372,6 +392,7 @@ interface SettingsRouteLazyRouteChildren {
 
 const SettingsRouteLazyRouteChildren: SettingsRouteLazyRouteChildren = {
   SettingsAiOptionsRoute: SettingsAiOptionsRoute,
+  SettingsApiKeysRoute: SettingsApiKeysRoute,
   SettingsAppearanceRoute: SettingsAppearanceRoute,
   SettingsFeaturesRoute: SettingsFeaturesRoute,
   SettingsModelsRoute: SettingsModelsRoute,

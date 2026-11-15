@@ -11,6 +11,7 @@ import { ConvexProvider } from "convex/react";
 import { ThemeProvider } from "next-themes";
 import { env } from "#/env";
 import { TooltipProvider } from "../components/ui/tooltip";
+import { OnboardingGate } from "../components/onboarding/onboarding-gate";
 import { RouteErrorComponent } from "#/components/route-error";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { convexClient } from "../lib/convex";
@@ -59,9 +60,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 		>
 			<TooltipProvider>
 				{convexClient ? (
-					<ConvexProvider client={convexClient}>{children}</ConvexProvider>
+					<ConvexProvider client={convexClient}>
+						{children}
+						<OnboardingGate />
+					</ConvexProvider>
 				) : (
-					children
+					<>
+						{children}
+						<OnboardingGate />
+					</>
 				)}
 			</TooltipProvider>
 		</ThemeProvider>

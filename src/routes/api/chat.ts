@@ -23,6 +23,7 @@ type ChatBody = {
 	userId?: string;
 	assistantClientUuid?: string;
 	webSearch?: boolean;
+	apiKey?: string;
 };
 
 const WEB_SEARCH_SYSTEM_PROMPT = `You have access to a web_search tool that searches the web for up-to-date information.
@@ -120,12 +121,7 @@ export const Route = createFileRoute("/api/chat")({
 							headers: { "Content-Type": "application/json" },
 						});
 					}
-					const apiKey = process.env.GEMINI_API_KEY;
-					if (!apiKey) {
-						throw new ChatError("internal:api", {
-							cause: "GEMINI_API_KEY is not set on the server.",
-						});
-					}
+					let apiKey = process.env.GEMINI_API_KEY;
 
 					let body: ChatBody;
 					try {
@@ -193,6 +189,15 @@ export const Route = createFileRoute("/api/chat")({
 						}
 					} else {
 						effectiveUserId = sessionUserId;
+					}
+
+					if (body.apiKey && body.apiKey.trim()) {
+						apiKey = body.apiKey.trim();
+					}
+					if (!apiKey) {
+						throw new ChatError("internal:api", {
+							cause: "No Gemini API key configured. Set GEMINI_API_KEY on the server or provide one in settings.",
+						});
 					}
 
 					const model = body.model || "gemini-3.5-flash-lite";
