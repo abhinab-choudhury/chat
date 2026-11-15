@@ -12,7 +12,6 @@ A real-time chat application built with TanStack Start, Convex, and Better Auth.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh)
 - [Node.js](https://nodejs.org)
 - [Docker](https://docker.com) (running locally)
 
@@ -21,7 +20,7 @@ A real-time chat application built with TanStack Start, Convex, and Better Auth.
 ### 1. Install dependencies
 
 ```bash
-bun install
+npm install
 ```
 
 ### 2. Configure environment variables
@@ -45,15 +44,7 @@ docker compose up -d
 Run the web app in your first terminal:
 
 ```bash
-bun run dev
-```
-
-> **Note:** Do not use `bun --bun` or `bun run --parallel`. Both force Bun's runtime and break Vite's dev server with a 10s idle timeout.
-
-In a second terminal, sync your Convex functions and schema:
-
-```bash
-bun run dev:convex
+npm run dev
 ```
 
 ## Local URLs
