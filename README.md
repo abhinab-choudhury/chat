@@ -1,20 +1,62 @@
-Welcome to your new TanStack Start app!
+# .Chat
 
-# Getting Started
+A real-time chat application built with TanStack Start, Convex, and Better Auth.
 
-To run this application:
+## Tech Stack
+
+- **Framework:** TanStack Start
+- **Real-time Backend & Database:** Convex
+- **Authentication & Database:** Better Auth + PostgreSQL
+- **Email Testing:** Mailpit
+- **Package Manager:** Bun (Node.js runtime for Vite dev server)
+
+## Prerequisites
+
+- [Bun](https://bun.sh)
+- [Node.js](https://nodejs.org)
+- [Docker](https://docker.com) (running locally)
+
+## Getting Started
+
+### 1. Install dependencies
 
 ```bash
 bun install
+```
 
-# Start Postgres + Mailpit (Better Auth / email)
+### 2. Configure environment variables
+
+Copy the example environment file and fill in your credentials before running or deploying:
+
+```bash
+cp .env.example .env.local
+```
+
+### 3. Start local services
+
+Start PostgreSQL and Mailpit (for Better Auth and local email testing):
+
+```bash
 docker compose up -d
+```
 
-# Run the web app (Node runtime; do NOT use `bun --bun` or `bun run --parallel`,
-# both force Bun's runtime and break Vite's dev server with a 10s idle timeout)
+### 4. Start the development servers
+
+Run the web app in your first terminal:
+
+```bash
 bun run dev
+```
 
-# In a second terminal: sync Convex functions/schema and watch for changes
+> **Note:** Do not use `bun --bun` or `bun run --parallel`. Both force Bun's runtime and break Vite's dev server with a 10s idle timeout.
+
+In a second terminal, sync your Convex functions and schema:
+
+```bash
 bun run dev:convex
 ```
 
+## Local URLs
+
+- **App:** `http://localhost:3000`
+- **Mailpit UI:** `http://localhost:8025`
