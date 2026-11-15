@@ -22,6 +22,15 @@ interface MyRouterContext {
 	queryClient: QueryClient;
 }
 
+const APP_TITLE = env.VITE_APP_TITLE ?? ".Chat";
+const APP_DESCRIPTION = "Chat application which believes on BYOK";
+/** Absolute origin so crawlers get fully-qualified og:url / og:image values. */
+const APP_URL = (env.VITE_APP_URL ?? "https://chat.abhinab.tech").replace(
+	/\/$/,
+	"",
+);
+const OG_IMAGE = `${APP_URL}/og_image.png`;
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	errorComponent: RouteErrorComponent,
 	head: () => ({
@@ -34,8 +43,34 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: env.VITE_APP_TITLE ?? ".Chat",
+				title: APP_TITLE,
 			},
+			{
+				name: "description",
+				content: APP_DESCRIPTION,
+			},
+
+			// Open Graph — used by Facebook, LinkedIn, Discord, Slack,
+			// Mastodon and Bluesky.
+			{ property: "og:type", content: "website" },
+			{ property: "og:site_name", content: APP_TITLE },
+			{ property: "og:title", content: APP_TITLE },
+			{ property: "og:description", content: APP_DESCRIPTION },
+			{ property: "og:url", content: `${APP_URL}/` },
+			{ property: "og:image", content: OG_IMAGE },
+			{ property: "og:image:type", content: "image/png" },
+			{ property: "og:image:width", content: "1200" },
+			{ property: "og:image:height", content: "630" },
+			{ property: "og:image:alt", content: APP_DESCRIPTION },
+			{ property: "og:locale", content: "en_US" },
+
+			// X / Twitter
+			{ name: "twitter:card", content: "summary_large_image" },
+			{ name: "twitter:title", content: APP_TITLE },
+			{ name: "twitter:description", content: APP_DESCRIPTION },
+			{ name: "twitter:url", content: `${APP_URL}/` },
+			{ name: "twitter:image", content: OG_IMAGE },
+			{ name: "twitter:image:alt", content: APP_DESCRIPTION },
 		],
 		links: [
 			{

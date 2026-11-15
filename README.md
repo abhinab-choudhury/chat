@@ -18,8 +18,3 @@ bun run dev
 bun run dev:convex
 ```
 
-Or run both together (still uses Node runtime for Vite):
-
-```bash
-bun run dev:all
-```
