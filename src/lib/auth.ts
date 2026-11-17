@@ -6,8 +6,8 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import Redis from "ioredis";
 
 import { db, schema } from "#/database";
-import { sendOtpEmail } from "#/lib/email";
 import { env } from "#/env";
+import { sendOtpEmail } from "#/lib/email";
 
 const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 

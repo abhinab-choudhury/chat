@@ -49,6 +49,7 @@ export class BraveSearchAdapter implements SearchAdapter {
 
 		try {
 			const response = await fetch(`${this.config.baseUrl}?${params}`, {
+				signal: options.signal,
 				method: "GET",
 				headers: {
 					Accept: "application/json",

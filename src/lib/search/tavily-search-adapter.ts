@@ -37,6 +37,7 @@ export class TavilySearchAdapter implements SearchAdapter {
 			const chunksPerSource = scrapeContent ? 8 : 3;
 
 			const response = await fetch(`${this.config.baseUrl}/search`, {
+				signal: options.signal,
 				method: "POST",
 				headers: {
 					Authorization: `Bearer ${this.config.apiKey}`,

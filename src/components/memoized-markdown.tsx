@@ -1,12 +1,7 @@
-import type { Schema } from "hast-util-sanitize";
-import { marked } from "marked";
+import { math } from "@streamdown/math";
 import type * as React from "react";
 import { memo, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import rehypeSanitize from "rehype-sanitize";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
+import { Streamdown } from "streamdown";
 import "katex/dist/katex.min.css";
 import {
 	CodeBlock,
@@ -18,50 +13,9 @@ import {
 	CodeBlockTitle,
 } from "#/components/ui/code-block";
 import { useHighlightedCode } from "#/hooks/use-highlighted-code";
+import { prepareMathMarkdown } from "#/lib/math-markdown";
 
-const sanitizeSchema: Schema = {
-	tagNames: [
-		"h1",
-		"h2",
-		"h3",
-		"h4",
-		"h5",
-		"h6",
-		"p",
-		"blockquote",
-		"ul",
-		"ol",
-		"li",
-		"strong",
-		"em",
-		"del",
-		"code",
-		"pre",
-		"hr",
-		"br",
-		"a",
-		"img",
-		"table",
-		"thead",
-		"tbody",
-		"tr",
-		"th",
-		"td",
-		"span",
-	],
-	attributes: {
-		"*": ["className", "id", "data-theme", "style"],
-		a: ["href", "title", "target", "rel"],
-		img: ["src", "alt", "title", "width", "height"],
-		span: ["className", "style"],
-	},
-	protocols: { href: ["http", "https", "mailto"], src: ["http", "https"] },
-};
-
-function parseMarkdownIntoBlocks(markdown: string): string[] {
-	const tokens = marked.lexer(markdown);
-	return tokens.map((token) => token.raw);
-}
+const plugins = { math };
 
 // Mounted only for fenced code blocks so the highlighting hook is not used
 // for inline code.
@@ -97,11 +51,13 @@ function MarkdownCodeBlock({
 function MarkdownCode({
 	className,
 	children,
+	"data-block": isFencedBlock,
+	node: _node,
 	...props
-}: React.ComponentProps<"code">) {
+}: React.ComponentProps<"code"> & { "data-block"?: string; node?: unknown }) {
 	const match = /language-(\w+)/.exec(className || "");
 	const text = String(children).replace(/\n$/, "");
-	const isBlock = Boolean(match) || text.includes("\n");
+	const isBlock = isFencedBlock || Boolean(match) || text.includes("\n");
 
 	if (!isBlock) {
 		return (
@@ -117,35 +73,35 @@ function MarkdownCode({
 	return <MarkdownCodeBlock text={text} language={match?.[1] ?? "code"} />;
 }
 
-const MemoizedMarkdownBlock = memo(
-	({ content }: { content: string }) => (
-		<ReactMarkdown
-			remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-			rehypePlugins={[
-				[rehypeSanitize, sanitizeSchema],
-				[rehypeKatex, { output: "html" }],
-			]}
-			components={{ code: MarkdownCode }}
-		>
-			{content}
-		</ReactMarkdown>
-	),
-	(prev, next) => prev.content === next.content,
-);
-
-MemoizedMarkdownBlock.displayName = "MemoizedMarkdownBlock";
+const components = {
+	code: MarkdownCode,
+};
 
 export const MemoizedMarkdown = memo(
-	({ content, id }: { content: string; id: string }) => {
-		const blocks = useMemo(() => parseMarkdownIntoBlocks(content), [content]);
+	({
+		content,
+		isStreaming = false,
+	}: {
+		content: string;
+		id: string;
+		isStreaming?: boolean;
+	}) => {
+		const markdown = useMemo(
+			() => prepareMathMarkdown(content, isStreaming),
+			[content, isStreaming],
+		);
 		return (
-			<>
-				{blocks.map((block, index) => (
-					<MemoizedMarkdownBlock content={block} key={`${id}-block_${index}`} />
-				))}
-			</>
+			<Streamdown
+				className="chat-markdown min-w-0"
+				plugins={plugins}
+				components={components}
+				mode={isStreaming ? "streaming" : "static"}
+				isAnimating={isStreaming}
+				parseIncompleteMarkdown={isStreaming}
+			>
+				{markdown}
+			</Streamdown>
 		);
 	},
 );
-
 MemoizedMarkdown.displayName = "MemoizedMarkdown";

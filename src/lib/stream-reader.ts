@@ -1,6 +1,9 @@
-import type { WebSearchToolCall } from "#/lib/search/types";
+import { parseChatEvent, parseToolCall } from "./agent/events";
+import type { AgentPhase } from "./agent/progress";
+import type { WebSearchToolCall } from "./search/types";
 
 export interface StreamCallbacks {
+	onStatus?: (phase: AgentPhase) => void;
 	/** Called with the accumulated text so far, on every text chunk. */
 	onText: (accumulated: string) => void;
 	/** Called with the accumulated reasoning so far, on every reasoning chunk. */
@@ -13,11 +16,6 @@ export interface StreamResult {
 	text: string;
 	reasoning: string;
 	toolCalls: WebSearchToolCall[];
-}
-
-interface ChatStreamEvent {
-	t?: string;
-	d?: string;
 }
 
 /** Merge a tool event into the accumulated list: a "done" call replaces its
@@ -59,41 +57,54 @@ export async function consumeChatStream(
 	let toolCalls: WebSearchToolCall[] = [];
 	let buffer = "";
 
+	let completed = false;
 	const applyEvent = (line: string) => {
 		if (!line.trim()) return;
-		try {
-			const evt = JSON.parse(line) as ChatStreamEvent;
-			if (evt.t === "r" && evt.d) {
-				reasoning += evt.d;
-				callbacks.onReasoning(reasoning);
-			} else if (evt.t === "t" && evt.d) {
-				text += evt.d;
-				callbacks.onText(text);
-			} else if (evt.t === "tool" && evt.d) {
-				try {
-					const call = JSON.parse(evt.d) as WebSearchToolCall;
-					toolCalls = mergeToolCall(toolCalls, call);
-					callbacks.onToolCalls?.(toolCalls);
-				} catch {
-					// Ignore malformed tool payloads.
-				}
-			}
-		} catch {
-			// Fallback: treat unparseable lines as plain text chunks.
-			text += line;
+		const evt = parseChatEvent(line);
+		if (evt.t === "err")
+			throw new Error(evt.d || "The response could not be completed.");
+		if (evt.t === "e") {
+			completed = true;
+			return;
+		}
+		if (evt.t === "status") callbacks.onStatus?.(evt.d);
+		else if (evt.t === "r" && evt.d) {
+			reasoning += evt.d;
+			callbacks.onReasoning(reasoning);
+		} else if (evt.t === "t" && evt.d) {
+			text += evt.d;
 			callbacks.onText(text);
+		} else if (evt.t === "tool" && evt.d) {
+			const call = parseToolCall(evt.d);
+			toolCalls = mergeToolCall(toolCalls, call);
+			callbacks.onToolCalls?.(toolCalls);
 		}
 	};
-
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		buffer += decoder.decode(value, { stream: true });
-		const lines = buffer.split("\n");
-		buffer = lines.pop() ?? "";
-		for (const line of lines) applyEvent(line);
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			buffer = lines.pop() ?? "";
+			for (const line of lines) {
+				applyEvent(line);
+				if (completed) break;
+			}
+			if (completed) {
+				// The terminal event, not a socket close, defines successful completion.
+				void reader.cancel().catch(() => {});
+				break;
+			}
+		}
+		buffer += decoder.decode();
+		if (!completed && buffer) applyEvent(buffer);
+		if (!completed)
+			throw new Error("The response was interrupted. Please retry.");
+	} finally {
+		void reader.cancel().catch(() => {});
+		reader.releaseLock();
 	}
-	if (buffer) applyEvent(buffer);
 
 	return { text, reasoning, toolCalls };
 }

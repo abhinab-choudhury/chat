@@ -1,5 +1,5 @@
-import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { query } from "./_generated/server";
 
 export const getProject = query({
 	args: { projectId: v.id("projects"), userId: v.optional(v.string()) },

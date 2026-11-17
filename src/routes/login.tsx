@@ -270,10 +270,14 @@ function LoginPage() {
 
 					<div className="min-h-5">
 						{error ? (
-	<p role="alert" aria-live="polite" className="text-sm text-destructive">
-		{error}
-	</p>
-) : null}
+							<p
+								role="alert"
+								aria-live="polite"
+								className="text-sm text-destructive"
+							>
+								{error}
+							</p>
+						) : null}
 					</div>
 				</CardContent>
 			</Card>

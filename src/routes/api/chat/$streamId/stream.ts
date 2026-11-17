@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import { auth } from "#/lib/auth";
 import { convexApi, getConvexServerClient } from "#/lib/convex-server";
 import { ChatError, toChatError } from "#/lib/errors";
 import { getResumableStreamContext } from "#/lib/resumable-stream";
+import type { Id } from "../../../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/api/chat/$streamId/stream")({
 	server: {
@@ -19,6 +19,10 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 
 					const url = new URL(request.url);
 					const threadId = url.searchParams.get("threadId");
+					if (!threadId)
+						throw new ChatError("bad_request:stream", {
+							message: "threadId is required",
+						});
 
 					const session = await auth.api
 						.getSession({ headers: request.headers })
@@ -41,7 +45,7 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 						}
 						const ownerHint = sessionUserId;
 						const thread = await convex.query(convexApi.threads.getThread, {
-							threadId: threadId as any,
+							threadId: threadId as Id<"threads">,
 							userId: ownerHint,
 						});
 						const ownerId = (thread as { userId?: string } | null)?.userId;
@@ -50,7 +54,7 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 						}
 						const currentStreamId = (thread as { currentStreamId?: string })
 							.currentStreamId;
-						if (currentStreamId && currentStreamId !== params.streamId) {
+						if (currentStreamId !== params.streamId) {
 							return new Response(null, { status: 204 });
 						}
 					}

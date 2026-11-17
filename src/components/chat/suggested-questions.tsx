@@ -82,44 +82,62 @@ export function SuggestedQuestions({
 }
 
 export const DEFAULT_QUESTION_CATEGORIES: QuestionCategory[] = [
-  {
-    id: "create",
-    label: "Create",
-    icon: WandIcon,
-    questions: [
-      { id: "c1", label: "Create a 7-day launch email sequence for a SaaS app" },
-      { id: "c2", label: "Create a 60-second YouTube Short script on noise cancellation" },
-      { id: "c3", label: "Create a landing page hero section for an AI note-taker" },
-    ],
-  },
-  {
-    id: "explore",
-    label: "Explore",
-    icon: CompassIcon,
-    questions: [
-      { id: "e1", label: "Compare Redis vs. PostgreSQL for API rate-limiting" },
-      { id: "e2", label: "Break down why Notion's templates drove viral growth" },
-      { id: "e3", label: "Plan a 3-day local food and walking trip in Tokyo" },
-    ],
-  },
-  {
-    id: "code",
-    label: "Code",
-    icon: CodeIcon,
-    questions: [
-      { id: "cd1", label: "Create a React hook for debounced search inputs" },
-      { id: "cd2", label: "Write a Python script to find duplicate CSV rows" },
-      { id: "cd3", label: "Explain how JS event loop handles Promises vs. setTimeout" },
-    ],
-  },
-  {
-    id: "learn",
-    label: "Learn",
-    icon: GraduationCapIcon,
-    questions: [
-      { id: "l1", label: "Explain self-attention from Google's Transformer paper" },
-      { id: "l2", label: "Quiz me on SQL indexing and query optimization" },
-      { id: "l3", label: "Build a 4-week roadmap to learn system design" },
-    ],
-  },
+	{
+		id: "create",
+		label: "Create",
+		icon: WandIcon,
+		questions: [
+			{
+				id: "c1",
+				label: "Create a 7-day launch email sequence for a SaaS app",
+			},
+			{
+				id: "c2",
+				label: "Create a 60-second YouTube Short script on noise cancellation",
+			},
+			{
+				id: "c3",
+				label: "Create a landing page hero section for an AI note-taker",
+			},
+		],
+	},
+	{
+		id: "explore",
+		label: "Explore",
+		icon: CompassIcon,
+		questions: [
+			{ id: "e1", label: "Compare Redis vs. PostgreSQL for API rate-limiting" },
+			{
+				id: "e2",
+				label: "Break down why Notion's templates drove viral growth",
+			},
+			{ id: "e3", label: "Plan a 3-day local food and walking trip in Tokyo" },
+		],
+	},
+	{
+		id: "code",
+		label: "Code",
+		icon: CodeIcon,
+		questions: [
+			{ id: "cd1", label: "Create a React hook for debounced search inputs" },
+			{ id: "cd2", label: "Write a Python script to find duplicate CSV rows" },
+			{
+				id: "cd3",
+				label: "Explain how JS event loop handles Promises vs. setTimeout",
+			},
+		],
+	},
+	{
+		id: "learn",
+		label: "Learn",
+		icon: GraduationCapIcon,
+		questions: [
+			{
+				id: "l1",
+				label: "Explain self-attention from Google's Transformer paper",
+			},
+			{ id: "l2", label: "Quiz me on SQL indexing and query optimization" },
+			{ id: "l3", label: "Build a 4-week roadmap to learn system design" },
+		],
+	},
 ];

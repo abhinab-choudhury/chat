@@ -40,6 +40,7 @@ import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
 import { useSearchStore } from "#/store/search-store";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export function AppSidebar() {
 	const { state, setOpenMobile } = useSidebar();
@@ -49,7 +50,7 @@ export function AppSidebar() {
 	const { user, isPending, refetch } = useSession();
 	const [signingOut, setSigningOut] = React.useState(false);
 	const [renamingThread, setRenamingThread] = React.useState<{
-		id: string;
+		id: Id<"threads">;
 		title: string;
 	} | null>(null);
 	const generatingTitleThreadIds = useChatStore(
@@ -62,10 +63,10 @@ export function AppSidebar() {
 		api.threads.listThreads,
 		{
 			key: userId ? `threads:${userId}` : "threads:anon",
-			default: [] as any,
+			default: [],
 		},
 		userId ? { userId } : "skip",
-	) as any;
+	);
 
 	const handleSignOut = async () => {
 		if (signingOut) return;
@@ -81,8 +82,9 @@ export function AppSidebar() {
 
 	const deleteThread = useMutation(api.threads.deleteThread);
 	const renameThread = useMutation(api.threads.renameThread);
-	const handleDeleteThread = (threadId: string) => {
-		void deleteThread({ threadId: threadId as any, userId: userId! });
+	const handleDeleteThread = (threadId: Id<"threads">) => {
+		if (!userId) return;
+		void deleteThread({ threadId, userId });
 	};
 
 	const handleNewChat = () => {
@@ -164,8 +166,8 @@ export function AppSidebar() {
 					<SidebarGroupContent>
 						<SidebarMenu>
 							{(threads ?? [])
-								.filter((t: any) => !t.archived)
-								.map((thread: any) => {
+								.filter((t) => !t.archived)
+								.map((thread) => {
 									const isActive =
 										location.pathname === `/thread/${thread._id}`;
 									return (
@@ -241,7 +243,7 @@ export function AppSidebar() {
 									);
 								})}
 							{(!threads ||
-								threads.filter((t: any) => !t.archived).length === 0) && (
+								threads.filter((t) => !t.archived).length === 0) && (
 								<SidebarMenuItem>
 									<SidebarMenuButton tooltip="No conversations yet">
 										{!collapsed ? <span>No conversations yet</span> : null}
@@ -330,7 +332,7 @@ export function AppSidebar() {
 				onRename={(title) => {
 					if (!renamingThread) return;
 					void renameThread({
-						threadId: renamingThread.id as any,
+						threadId: renamingThread.id,
 						title,
 					});
 					setRenamingThread(null);

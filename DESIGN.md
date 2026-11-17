@@ -1,87 +1,29 @@
-# Architecture Design — .Chat
+# .Chat — memory and evidence pipeline
 
-A real-time AI chat app: **TanStack Start (React 19, SSR)** frontend, **Convex** as the
-database + reactive sync engine, **Better Auth + Postgres (Drizzle)** for identity and
-encrypted BYOK settings, and **AI SDK v5** server routes for streaming model calls.
+**One existing app.** The React UI, Better Auth, encrypted provider settings and Convex message subscriptions stay in place. `/api/chat` is now a small authenticated credential bridge; the agent, retrieval, review and commits execute in a Convex HTTP action using `@convex-dev/agent`. Provider keys travel server-to-server for this request only, never into workflow arguments or memory documents. A short-lived HMAC envelope authenticates the bridge; request IDs prevent replayed generations.
 
-## How it works
+## Flow and latency
 
-**Data & sync.** Convex is the single source of truth. Threads and messages live in
-Convex tables (with `clientUuid` for idempotent client-generated writes); clients
-subscribe via `useQuery`, which re-runs on server writes and pushes over WebSocket —
-no refetching anywhere. Per-user disk caches (`convex-cached-query`, `local-chat-cache`)
-give instant paints on reload; server state always wins on reconcile.
+`Submit → immediate UI status → context → research/draft → evidence review → commit → answer`
 
-**Chat flow.** `POST /api/chat` is the one hot path. It authenticates, loads the
-user's *decrypted-on-server* provider key (BYOK — keys never reach the browser),
-resolves project prompt/model context, marks the thread live, then streams
-`streamText` as compact NDJSON events (`t` text / `r` reasoning / `tool` / `e` end).
-The stream is tee'd: one branch feeds the client, one is drained in the background so
-generation and finalization (persist assistant message, unmark live) complete even if
-the tab closes. With `REDIS_URL`, `resumable-stream` records the stream in Redis so a
-reload can resume mid-response instead of losing it.
+The original endpoint already used NDJSON; SSR was not the cause of model latency. The UI now shows an optimistic preparing state at submit, and the response flushes a status event before authentication, settings lookup or Redis registration. Convex emits memory, research, review and save stages. Stream errors and incomplete EOF now fail visibly instead of being mistaken for successful answers.
 
-**Optimistic UI.** First message: create thread + persist user message + navigate in
-parallel; a placeholder renders immediately while background title generation renames
-the thread reactively. `sendMessage` uses Convex optimistic updates; the client
-streams into a local store until the finalized assistant message lands.
+**Strict review has a real cost:** raw draft tokens cannot be shown while promising review before delivery. This implementation streams progress and search activity immediately, buffers the draft, reviews it, persists the approved answer, then emits its text. It does not fake token-by-token typing. A later sentence-by-sentence gate could release approved chunks sooner, but must handle cross-sentence contradictions and adds review calls. Transport progress fixes an idle-looking interface; it does not eliminate inference time.
 
-**Tools & memory.** Web search is an AI SDK tool built from a pluggable adapter set
-(Tavily, Brave, Serper, Firecrawl) with the provider/key from encrypted user settings;
-tool calls/results flow through the stream into persisted `toolData`. Memory is
-Supermemory (`withSupermemory`, per-user namespace), server-keyed and opt-in. Model
-choice, reasoning effort, tool toggles, and per-thread MCP overrides live in a Zustand
-`model-store`.
+## Two memory layers, one source of truth
 
-## Why built this way
+**Short term:** the latest 20 persisted messages, capped at 32,000 characters, loaded from the existing thread on the server. Browser-supplied assistant history is no longer trusted as model context.
 
-- **Convex-first** because a sync engine is server store + subscriptions + transactions;
-  Convex provides all three, so chat is real-time out of the box and we don't maintain
-  a WebSocket layer or backplane.
-- **One NDJSON endpoint** instead of the AI SDK's default protocol to keep the event
-  format tiny, own the tool/reasoning event mapping, and guarantee server-side
-  finalization independent of client lifecycle.
-- **BYOK encrypted at rest** (AES server-side) with provider calls only from the
-  server — better security posture and zero shared key costs.
-- **Adapters over vendor lock-in**: search providers behind one interface; Supermemory
-  as a swappable wrapper around the model, not hardcoded into it.
-- **Thin routes, fat hook**: `useThreadChat` owns thread logic; route files stay
-  presentational.
+**Long term:** dated records of completed reviewed exchanges, indexed by owner and searchable text. Retrieval combines six lexical matches with six recent records, bounded to 16,000 characters. Each record keeps the original question, answer, source-message references, observation time and review metadata. Historical statements remain historical claims, not verified current facts. The memory toggle controls cross-chat retrieval and future archival; recent thread context always applies. Existing conversations are not automatically backfilled in this first version.
 
-## Considered and rejected
+**Synchronization:** the answer commit atomically starts a durable `@convex-dev/workflow` projection. It copies accepted turns into memory asynchronously and idempotently by source ID. Failed drafts never enter memory. Retrieval checks current ownership, archive state, and both question/answer source content, excluding deleted or edited sources. This is a derived index, not two databases continuously overwriting each other. Old source records remain stored until a future retention/cleanup policy removes them.
 
-- **Redis pub/sub fan-out as core sync** — redundant with Convex's own push; kept Redis
-  only for resumable streams (transient transport, not a second source of truth).
-- **PowerSync/Replicache offline layer** — full offline-first isn't needed yet; Convex
-  + local caches + idempotent mutations cover the common blips. Revisit if offline
-  writes become a requirement.
-- **Storing plaintext keys / env-only keys** — plaintext leaks, env-only keys block
-  true BYOK; chose encrypted per-user storage.
-- **Server-side markdown/stream diffing** — premature; client reconciles by stable
-  keys (`clientUuid`, stream id) today.
+## Evidence review and limits
 
-## With another week
+Web search remains the only external agent tool. Existing provider adapters, budgets, deduplication and deadlines are reused. A separate reviewer sees the draft, exact bounded source excerpts and conversation evidence. It returns a supported, qualified or blocked verdict plus a revised answer. A deterministic URL check rejects citations absent from retrieved evidence. Only reviewed text is committed to the component and existing UI messages; no unreviewed reasoning is sent to the browser. A watchdog marks abandoned runs failed.
 
-The detailed, file-level plan lives in `docs/next-week-plan.md`. In priority order:
+A second LLM is not a truth oracle. “Supported” means supported within supplied evidence; snippets can be incomplete or wrong, and same-model review has correlated blind spots. No-source current claims must be qualified. Lexical retrieval misses paraphrases and is not exhaustive historical/date recall. These are evaluation targets, not hidden guarantees.
 
-1. **Chat folders (projects)** — the data model is done (`projects` table, thread
-   `projectId`), but only `getProject` exists: add CRUD + a move-thread mutation,
-   a sidebar folders section, and the `/library` pages. Wire the project
-   `customPrompt`/`defaultModel` that `/api/chat` currently fetches and discards.
-2. **File uploads & management** — Convex storage-backed attachments (schema field,
-   upload-URL + authenticated file URLs, `sendMessage` metadata), composer chips
-   using the existing `Attachment` kit, server-side model context from persisted
-   messages, and image/text rendering in messages.
-3. **Micro-interactions & animations** — message enter/caret/typing/shimmer
-   keyframes in `styles.css` (tw-animate-css is already there), respecting
-   `prefers-reduced-motion`.
-4. **Mobile responsiveness** — composer safe-area + wrapping controls, touch
-   targets, mobile action affordances, and a fixed-viewport-height/scroll-anchoring
-   bug pass.
-5. **PostHog integration** — the provider and a reverse proxy already exist; wire
-   the SDK through `/api/phr`, add client-side page views, identify signed-in
-   users, and instrument chat/product events (see `docs/next-week-plan.md` §5).
-6. Then the previously queued items: memorization layer (per-user Supermemory keys
-   + memory UI) → Supermemory/MCP as first-class tools → configurable tool
-   registry → provider registry for models → sync engine v2 (durable outbox +
-   unified chat mutation + time-to-first-token telemetry).
+## Tradeoffs and next week
+
+Kept the existing optional Redis transport for reload compatibility; it is not the memory engine. Rejected a parallel server/database, opaque hosted memory, fake streaming, and promoting drafts to durable context. Tests cover ownership, replay/concurrency, idempotent commits/workflow sync, failed-run exclusion, memory isolation, changed sources, signed envelopes and stream failures. Next: measure live claim support and first-status/answer latency; improve dated/hybrid retrieval and corrections; add retention controls; harden the older public Convex APIs, whose client-supplied identity pattern predates this pipeline.

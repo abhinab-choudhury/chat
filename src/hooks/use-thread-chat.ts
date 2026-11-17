@@ -1,6 +1,7 @@
 import { useMutation } from "convex/react";
 import * as React from "react";
 import { useSession } from "#/hooks/auth-hooks";
+import type { AgentPhase } from "#/lib/agent/progress";
 import { useDiskCachedQuery } from "#/lib/convex-cached-query";
 import {
 	readCachedMessages,
@@ -12,7 +13,7 @@ import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 
 export interface ChatMessage {
 	_id: string;
@@ -26,7 +27,7 @@ export interface ChatMessage {
 export interface UseThreadChatResult {
 	isPending: boolean;
 	currentUserId: string | null;
-	thread: any;
+	thread: Doc<"threads"> | null | undefined;
 	canView: boolean;
 	isOwner: boolean;
 	messages: ChatMessage[] | undefined;
@@ -36,6 +37,8 @@ export interface UseThreadChatResult {
 	busy: boolean;
 	pendingAutoSend: boolean;
 	streamingText: string;
+	agentPhase: AgentPhase;
+	chatError: string | null;
 	streamingReasoning: string;
 	streamingToolCalls: WebSearchToolCall[];
 	webSearchEnabled: boolean;
@@ -58,10 +61,10 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		api.threads.getThread,
 		{
 			key: `thread:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined as any,
+			default: undefined,
 		},
 		{ threadId, userId: currentUserId ?? undefined },
-	) as any;
+	);
 	const canView =
 		!!thread &&
 		!!currentUserId &&
@@ -70,10 +73,10 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		api.messages.getMessages,
 		{
 			key: `messages:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined as any,
+			default: undefined,
 		},
 		canView ? { threadId, userId: currentUserId ?? undefined } : "skip",
-	) as any;
+	);
 
 	// Best-effort local cache of finalized messages for instant paints.
 	React.useEffect(() => {
@@ -128,7 +131,6 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			}
 		},
 	);
-	const setThreadStreaming = useMutation(api.threads.setThreadStreaming);
 
 	const input = useChatStore((s) => s.input);
 	const setInput = useChatStore((s) => s.setInput);
@@ -158,6 +160,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 	const isOwner =
 		!!thread && !!currentUserId && thread.userId === currentUserId;
 
+	const [agentPhase, setAgentPhase] = React.useState<AgentPhase>("preparing");
+	const [chatError, setChatError] = React.useState<string | null>(null);
 	const [streamingText, setStreamingText] = React.useState("");
 	const [streamingReasoning, setStreamingReasoning] = React.useState("");
 	const [streamingToolCalls, setStreamingToolCalls] = React.useState<
@@ -169,13 +173,12 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 	const autoSentRef = React.useRef(false);
 	const resumedRef = React.useRef(false);
 
-	React.useEffect(() => {
-		setThreadId(threadId);
-	}, [threadId, setThreadId]);
-
 	// Reset per-thread streaming bookkeeping when navigating between threads so a
 	// previous thread's in-flight stream doesn't leak into this one's UI.
 	React.useEffect(() => {
+		setThreadId(threadId);
+		setChatError(null);
+		setAgentPhase("preparing");
 		autoSentRef.current = false;
 		resumedRef.current = false;
 		setStreamingText("");
@@ -189,7 +192,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			setBusy(false);
 			sendingRef.current = false;
 		};
-	}, [threadId]);
+	}, [threadId, setThreadId, setBusy]);
 
 	const handleSubmit = React.useCallback(
 		async (override?: string, sendUser: boolean = true) => {
@@ -201,6 +204,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			}
 			sendingRef.current = true;
 			setBusy(true);
+			setAgentPhase("preparing");
+			setChatError(null);
 			if (sendUser && !override) setInput("");
 			try {
 				if (sendUser && trimmed) {
@@ -213,7 +218,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 					});
 				}
 
-				const baseHistory = (messages ?? []).map((m: any) => ({
+				const baseHistory = (messages ?? []).map((m) => ({
 					role: m.role as "user" | "assistant" | "system",
 					content: m.content,
 				}));
@@ -226,8 +231,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 				// message if it hasn't appeared in the Convex query yet.
 				if (!sendUser && pendingInitialMessage) {
 					const hasPending = baseHistory.some(
-						(m: any) =>
-							m.role === "user" && m.content === pendingInitialMessage,
+						(m) => m.role === "user" && m.content === pendingInitialMessage,
 					);
 					if (!hasPending) {
 						history = [
@@ -239,13 +243,6 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 				}
 
 				const streamId = crypto.randomUUID();
-				const assistantClientUuid = `${streamId}:assistant`;
-				// Optimistic local mark; server also sets streaming state authoritatively.
-				void setThreadStreaming({
-					threadId,
-					isLive: true,
-					streamId,
-				});
 
 				setStreamingText("");
 				setStreamingReasoning("");
@@ -263,8 +260,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 						streamId,
 						threadId,
 						userId: currentUserId ?? undefined,
-						assistantClientUuid,
 						webSearch: webSearchEnabled,
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 						memory: memoryEnabled,
 						reasoningEffort,
 					}),
@@ -281,41 +278,23 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 					throw new Error(message);
 				}
 
-				const {
-					text: accumulated,
-					reasoning: reasoningAccumulated,
-					toolCalls,
-				} = await consumeChatStream(res.body, {
+				await consumeChatStream(res.body, {
 					onText: setStreamingText,
 					onReasoning: setStreamingReasoning,
 					onToolCalls: setStreamingToolCalls,
+					onStatus: setAgentPhase,
 				});
 
-				const doneToolCalls = toolCalls.filter((c) => c.state === "done");
-				if (
-					accumulated.trim() ||
-					reasoningAccumulated.trim() ||
-					doneToolCalls.length > 0
-				) {
-					// Idempotent fallback: server finalizes on completion, client save is safe.
-					await send({
-						clientUuid: assistantClientUuid,
-						threadId,
-						role: "assistant",
-						content: accumulated,
-						reasoning: reasoningAccumulated.trim() || undefined,
-						toolData: doneToolCalls.length
-							? { webSearches: doneToolCalls }
-							: undefined,
-						userId: currentUserId ?? undefined,
-					});
-				}
-				void setThreadStreaming({ threadId, isLive: false });
 				setStreamingText("");
 				setStreamingReasoning("");
 				setStreamingToolCalls([]);
 			} catch (e) {
-				if ((e as any)?.name !== "AbortError") console.error(e);
+				if (!(e instanceof Error && e.name === "AbortError")) {
+					setChatError(
+						e instanceof Error ? e.message : "Unable to complete the response.",
+					);
+					console.error(e);
+				}
 				setStreamingText("");
 				setStreamingReasoning("");
 			} finally {
@@ -338,7 +317,6 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			setInput,
 			isOwner,
 			currentUserId,
-			setThreadStreaming,
 			pendingInitialMessage,
 			setPendingInitialMessage,
 		],
@@ -357,7 +335,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			setPendingAutoSend(false);
 			void handleSubmit(undefined, false);
 		}
-	}, [pendingAutoSend, isOwner, messages, handleSubmit, setPendingAutoSend]);
+	}, [pendingAutoSend, isOwner, thread, handleSubmit, setPendingAutoSend]);
 
 	// Resume an in-flight stream after a reconnect/reload.
 	React.useEffect(() => {
@@ -365,10 +343,10 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			return;
 		if (busy || sendingRef.current) return;
 		resumedRef.current = true;
+		setBusy(true);
 		setStreamingText("");
 		setStreamingReasoning("");
 		(async () => {
-			const assistantClientUuid = `${thread.currentStreamId}:assistant`;
 			try {
 				const params = new URLSearchParams({
 					threadId,
@@ -378,53 +356,34 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 					`/api/chat/${thread.currentStreamId}/stream?${params.toString()}`,
 				);
 				if (res.status === 204 || !res.ok || !res.body) {
-					void setThreadStreaming({ threadId, isLive: false });
 					return;
 				}
-				const {
-					text: accumulated,
-					reasoning: reasoningAccumulated,
-					toolCalls,
-				} = await consumeChatStream(res.body, {
+				await consumeChatStream(res.body, {
 					onText: setStreamingText,
 					onReasoning: setStreamingReasoning,
 					onToolCalls: setStreamingToolCalls,
+					onStatus: setAgentPhase,
 				});
-				const doneToolCalls = toolCalls.filter((c) => c.state === "done");
-				if (
-					accumulated.trim() ||
-					reasoningAccumulated.trim() ||
-					doneToolCalls.length > 0
-				) {
-					await send({
-						clientUuid: assistantClientUuid,
-						threadId,
-						role: "assistant",
-						content: accumulated,
-						reasoning: reasoningAccumulated.trim() || undefined,
-						toolData: doneToolCalls.length
-							? { webSearches: doneToolCalls }
-							: undefined,
-						userId: currentUserId ?? undefined,
-					});
-				}
-				void setThreadStreaming({ threadId, isLive: false });
+
 				setStreamingText("");
 				setStreamingReasoning("");
 				setStreamingToolCalls([]);
 			} catch (e) {
+				setChatError(
+					e instanceof Error ? e.message : "Unable to resume the response.",
+				);
 				console.error(e);
-				void setThreadStreaming({ threadId, isLive: false });
+			} finally {
+				setBusy(false);
 			}
 		})();
 	}, [
 		thread?.isLive,
 		thread?.currentStreamId,
 		busy,
+		setBusy,
 		threadId,
-		send,
 		currentUserId,
-		setThreadStreaming,
 	]);
 
 	const displayMessages = React.useMemo(() => {
@@ -471,6 +430,8 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		busy,
 		pendingAutoSend,
 		streamingText,
+		agentPhase,
+		chatError,
 		streamingReasoning,
 		streamingToolCalls,
 		webSearchEnabled,

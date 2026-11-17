@@ -46,6 +46,7 @@ export class FirecrawlSearchAdapter implements SearchAdapter {
 
 		try {
 			const response = await fetch(`${this.config.baseUrl}/v1/search`, {
+				signal: options.signal,
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

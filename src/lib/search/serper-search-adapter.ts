@@ -49,13 +49,17 @@ export class SerperSearchAdapter implements SearchAdapter {
 		const { limit = 5, scrapeContent = false } = options;
 
 		try {
-			const searchResults = await this.performSearch(query, limit);
+			const searchResults = await this.performSearch(
+				query,
+				limit,
+				options.signal,
+			);
 
 			if (!scrapeContent) {
 				return searchResults;
 			}
 
-			return await this.scrapeAndEnrichResults(searchResults);
+			return await this.scrapeAndEnrichResults(searchResults, options.signal);
 		} catch (error) {
 			console.error("Serper search error:", error);
 			throw new Error(
@@ -67,8 +71,10 @@ export class SerperSearchAdapter implements SearchAdapter {
 	private async performSearch(
 		query: string,
 		limit: number,
+		signal?: AbortSignal,
 	): Promise<SearchResult[]> {
 		const response = await fetch(this.config.baseUrl ?? "", {
+			signal,
 			method: "POST",
 			headers: {
 				"X-API-KEY": this.config.apiKey,
@@ -112,9 +118,10 @@ export class SerperSearchAdapter implements SearchAdapter {
 
 	private async scrapeAndEnrichResults(
 		results: SearchResult[],
+		signal?: AbortSignal,
 	): Promise<SearchResult[]> {
 		const scrapingJobs = results.map((result) =>
-			this.scrapeUrl(result.url)
+			this.scrapeUrl(result.url, signal)
 				.then((scrapedContent) => {
 					if (scrapedContent) {
 						return {
@@ -162,9 +169,13 @@ export class SerperSearchAdapter implements SearchAdapter {
 		return enrichedResults;
 	}
 
-	private async scrapeUrl(url: string): Promise<SerperScrapeResponse | null> {
+	private async scrapeUrl(
+		url: string,
+		signal?: AbortSignal,
+	): Promise<SerperScrapeResponse | null> {
 		try {
 			const response = await fetch(this.config.scrapeUrl ?? "", {
+				signal,
 				method: "POST",
 				headers: {
 					"X-API-KEY": this.config.apiKey,

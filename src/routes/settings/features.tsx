@@ -13,6 +13,7 @@ import {
 	CardTitle,
 } from "#/components/ui/card";
 import { Input } from "#/components/ui/input";
+import { Kbd } from "#/components/ui/kbd";
 import { Label } from "#/components/ui/label";
 import { Switch } from "#/components/ui/switch";
 import { SEARCH_PROVIDER_CATALOG } from "#/lib/search/provider-catalog";
@@ -23,7 +24,6 @@ import {
 } from "#/lib/shortcuts";
 import { useModelStore } from "#/store/model-store";
 import { useUserSettingsStore } from "#/store/user-settings-store";
-import { Kbd } from "#/components/ui/kbd";
 
 export const Route = createFileRoute("/settings/features")({
 	component: FeaturesSettings,
@@ -211,7 +211,8 @@ function FeaturesSettings() {
 					<div className="flex items-center justify-between gap-4 border-t pt-4">
 						<p className="text-xs text-muted-foreground">
 							Use ⌘ instead of Ctrl on macOS. Combinations the browser reserves
-							(like <Kbd>Ctrl</Kbd>+<Kbd>N</Kbd>, which opens a new window) are rejected.
+							(like <Kbd>Ctrl</Kbd>+<Kbd>N</Kbd>, which opens a new window) are
+							rejected.
 						</p>
 						<Button
 							variant="outline"

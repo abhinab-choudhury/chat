@@ -1,5 +1,5 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 
 // ---------- Messages ----------
 
@@ -24,7 +24,11 @@ export const sendMessage = mutation({
 	args: {
 		clientUuid: v.string(),
 		threadId: v.id("threads"),
-		role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+		role: v.union(
+			v.literal("user"),
+			v.literal("assistant"),
+			v.literal("system"),
+		),
 		content: v.string(),
 		reasoning: v.optional(v.string()),
 		toolData: v.optional(v.any()),

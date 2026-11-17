@@ -31,7 +31,10 @@ export interface DecryptedUserSettings {
 }
 
 function isMemoryConfigured(): boolean {
-	return Boolean(process.env.SUPERMEMORY_API_KEY?.trim());
+	return Boolean(
+		process.env.AGENT_BRIDGE_SECRET?.trim() &&
+			process.env.VITE_CONVEX_SITE_URL?.trim(),
+	);
 }
 
 function normalizeSearchKeys(

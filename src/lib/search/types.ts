@@ -9,6 +9,7 @@ export interface SearchResult {
 }
 
 export interface SearchOptions {
+	signal?: AbortSignal;
 	limit?: number;
 	scrapeContent?: boolean;
 	formats?: string[];
@@ -46,6 +47,11 @@ export interface WebSearchToolCall {
 
 /** Tool data persisted alongside an assistant message. */
 export interface WebSearchToolData {
+	validation?: {
+		status: "supported" | "qualified";
+		note: string;
+		checkedAt: number;
+	};
 	webSearches: WebSearchToolCall[];
 }
 

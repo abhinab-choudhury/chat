@@ -244,3 +244,24 @@
 [data-streamdown="code-block-body"] {
   background-color: var(--card);
 }
+
+/* KaTeX positions glyphs using font metrics: prose tracking breaks that geometry. */
+.chat-markdown .katex {
+  letter-spacing: normal;
+  text-indent: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Keep wide matrices/equations inside the message without clipping tall glyphs. */
+.chat-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
+.chat-markdown .katex-error {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

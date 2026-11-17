@@ -8,6 +8,11 @@
  * @module
  */
 
+import type * as agent_http from "../agent/http.js";
+import type * as agent_memory from "../agent/memory.js";
+import type * as agent_state from "../agent/state.js";
+import type * as agent_validators from "../agent/validators.js";
+import type * as http from "../http.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
 import type * as schema_messages from "../schema/messages.js";
@@ -23,6 +28,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "agent/http": typeof agent_http;
+  "agent/memory": typeof agent_memory;
+  "agent/state": typeof agent_state;
+  "agent/validators": typeof agent_validators;
+  http: typeof http;
   messages: typeof messages;
   projects: typeof projects;
   "schema/messages": typeof schema_messages;
@@ -58,4 +68,7 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
+  workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
+};

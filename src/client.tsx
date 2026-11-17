@@ -1,5 +1,5 @@
-import { StrictMode, startTransition } from "react";
 import { StartClient } from "@tanstack/react-start/client";
+import { StrictMode, startTransition } from "react";
 
 async function main() {
 	if (import.meta.env.DEV) {

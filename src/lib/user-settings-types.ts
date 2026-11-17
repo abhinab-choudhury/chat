@@ -12,6 +12,6 @@ export interface PublicUserSettings {
 	geminiKeyHint: string | null;
 	defaultSearchProvider: SearchProviderType | null;
 	searchProviders: PublicSearchProviderStatus[];
-	/** True when the server has a Supermemory key configured via env. */
+	/** True when the Convex agent bridge is configured. */
 	memoryAvailable: boolean;
 }

@@ -2,6 +2,7 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export const threads = defineTable({
+	agentThreadId: v.optional(v.string()),
 	title: v.string(),
 	userId: v.string(),
 	createdAt: v.number(),

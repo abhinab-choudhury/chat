@@ -8,6 +8,7 @@ import { MessageScrollerItem } from "#/components/ui/message-scroller";
 import type { WebSearchToolCall } from "#/lib/search/types";
 
 interface StreamingMessageProps {
+	status?: string;
 	streamingText: string;
 	streamingReasoning: string;
 	streamingToolCalls?: WebSearchToolCall[];
@@ -18,6 +19,7 @@ interface StreamingMessageProps {
  * and streaming text with a blinking caret, plus live web-search activity.
  */
 export function StreamingMessage({
+	status,
 	streamingText,
 	streamingReasoning,
 	streamingToolCalls,
@@ -34,6 +36,14 @@ export function StreamingMessage({
 				className="w-full max-w-none flex-col items-start gap-1"
 			>
 				<MessageContent className="select-text w-full text-sm">
+					{status && !streamingText ? (
+						<output
+							aria-live="polite"
+							className="mb-2 text-xs text-muted-foreground"
+						>
+							{status}
+						</output>
+					) : null}
 					{(streamingToolCalls ?? []).map((call) => (
 						<WebSearchResults key={call.id ?? call.query} call={call} />
 					))}
@@ -64,10 +74,14 @@ export function StreamingMessage({
 					) : null}
 					{streamingText ? (
 						<div className={assistantProseClass}>
-							<MemoizedMarkdown content={streamingText} id="__streaming__" />
+							<MemoizedMarkdown
+								content={streamingText}
+								id="__streaming__"
+								isStreaming
+							/>
 							<span
 								aria-hidden="true"
-								className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse rounded-full bg-primary/70 align-baseline"
+								className="ml-0.5 inline-block h-4 w-0.5 translate-y-0.5 animate-pulse rounded-full bg-primary/70 align-baseline"
 							/>
 						</div>
 					) : null}

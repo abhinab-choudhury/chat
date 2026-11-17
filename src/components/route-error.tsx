@@ -1,5 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 
 export function RouteErrorComponent({ error, reset }: ErrorComponentProps) {
 	const message =
@@ -21,10 +21,7 @@ export function RouteErrorComponent({ error, reset }: ErrorComponentProps) {
 				>
 					Try again
 				</button>
-				<Link
-					to="/"
-					className="rounded-md border px-4 py-2 text-sm"
-				>
+				<Link to="/" className="rounded-md border px-4 py-2 text-sm">
 					Go home
 				</Link>
 			</div>

@@ -40,7 +40,11 @@ export const Route = createFileRoute("/settings/profile")({
 });
 
 function UserAccountSettings() {
-	const { user, isPending: sessionLoading, refetch: refetchSession } = useSession();
+	const {
+		user,
+		isPending: sessionLoading,
+		refetch: refetchSession,
+	} = useSession();
 	const { data: sessionData } = authClient.useSession();
 	const { data: sessions = [], isPending: sessionsLoading } = useListSessions();
 	const updateUser = useUpdateUser();
@@ -128,7 +132,7 @@ function UserAccountSettings() {
 			setSigningOut(false);
 			busyRef.current = false;
 		}
-	}, [router, isAuthBusy]);
+	}, [router, isAuthBusy, refetchSession]);
 
 	const handleRevokeOtherSessions = React.useCallback(async () => {
 		if (busyRef.current || isAuthBusy) return;

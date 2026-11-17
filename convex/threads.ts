@@ -1,5 +1,5 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 
 // ---------- Threads ----------
 
@@ -85,14 +85,20 @@ export const createThread = mutation({
 export const renameThread = mutation({
 	args: { threadId: v.id("threads"), title: v.string() },
 	handler: async (ctx, args) => {
-		await ctx.db.patch(args.threadId, { title: args.title, updatedAt: Date.now() });
+		await ctx.db.patch(args.threadId, {
+			title: args.title,
+			updatedAt: Date.now(),
+		});
 	},
 });
 
 export const archiveThread = mutation({
 	args: { threadId: v.id("threads") },
 	handler: async (ctx, args) => {
-		await ctx.db.patch(args.threadId, { archived: true, updatedAt: Date.now() });
+		await ctx.db.patch(args.threadId, {
+			archived: true,
+			updatedAt: Date.now(),
+		});
 	},
 });
 

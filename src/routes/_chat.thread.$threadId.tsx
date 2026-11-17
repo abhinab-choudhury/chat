@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
-import { ChatMessageItem } from "#/components/chat/chat-message";
 import { ChatInput } from "#/components/chat/chat-input";
+import { ChatMessageItem } from "#/components/chat/chat-message";
 import { StreamingMessage } from "#/components/chat/streaming-message";
 import { RouteErrorComponent } from "#/components/route-error";
 import { Button } from "#/components/ui/button";
@@ -15,6 +15,7 @@ import {
 	MessageScrollerViewport,
 } from "#/components/ui/message-scroller";
 import { useThreadChat } from "#/hooks/use-thread-chat";
+import { agentPhases } from "#/lib/agent/progress";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/_chat/thread/$threadId")({
@@ -45,6 +46,8 @@ function RouteComponent() {
 		busy,
 		pendingAutoSend,
 		streamingText,
+		agentPhase,
+		chatError,
 		streamingReasoning,
 		streamingToolCalls,
 		selectedModel,
@@ -56,6 +59,7 @@ function RouteComponent() {
 	const [showScrollButton, setShowScrollButton] = React.useState(false);
 
 	React.useEffect(() => {
+		if (isPending || !canView) return;
 		const el = viewportRef.current;
 		if (!el) return;
 		const check = () => {
@@ -64,8 +68,14 @@ function RouteComponent() {
 		};
 		el.addEventListener("scroll", check, { passive: true });
 		check();
-		return () => el.removeEventListener("scroll", check);
-	}, [displayMessages]);
+		const observer = new ResizeObserver(check);
+		observer.observe(el);
+		if (el.firstElementChild) observer.observe(el.firstElementChild);
+		return () => {
+			observer.disconnect();
+			el.removeEventListener("scroll", check);
+		};
+	}, [isPending, canView]);
 
 	if (isPending) {
 		return (
@@ -113,8 +123,16 @@ function RouteComponent() {
 		<div className="relative flex-1 min-h-0">
 			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 				<MessageScroller className="absolute inset-0">
-					<MessageScrollerViewport ref={viewportRef} className="px-4 py-6 pb-36">
+					<MessageScrollerViewport
+						ref={viewportRef}
+						className="px-4 py-6 pb-36"
+					>
 						<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
+							{chatError ? (
+								<div role="alert" className="text-sm text-destructive">
+									{chatError}
+								</div>
+							) : null}
 							{displayMessages.map((m) => (
 								<ChatMessageItem
 									key={m._id}
@@ -125,6 +143,7 @@ function RouteComponent() {
 							{isStreaming ? (
 								<StreamingMessage
 									streamingText={streamingText}
+									status={agentPhases[agentPhase]}
 									streamingReasoning={streamingReasoning}
 									streamingToolCalls={streamingToolCalls}
 								/>
@@ -134,7 +153,13 @@ function RouteComponent() {
 									messageId="__thinking__"
 									className="flex w-full justify-start"
 								>
-									<div className="text-xs text-muted-foreground">Thinking…</div>
+									<output
+										className="text-xs text-muted-foreground"
+										aria-live="polite"
+									>
+										<span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-primary" />
+										{agentPhases[agentPhase]}
+									</output>
 								</MessageScrollerItem>
 							) : null}
 						</MessageScrollerContent>
@@ -153,7 +178,8 @@ function RouteComponent() {
 								className="rounded-full shadow-md"
 								onClick={() => {
 									const el = viewportRef.current;
-									if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+									if (el)
+										el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 								}}
 							>
 								<ChevronDownIcon className="size-4" />

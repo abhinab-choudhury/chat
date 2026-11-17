@@ -117,6 +117,19 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 								(message.toolData?.webSearches ?? []).map((call) => (
 									<WebSearchResults key={call.id ?? call.query} call={call} />
 								))}
+							{isAssistant && message.toolData?.validation ? (
+								<details className="mb-2 text-xs text-muted-foreground">
+									<summary className="cursor-pointer">
+										{message.toolData.validation.status === "qualified"
+											? "Reviewed · evidence limitations"
+											: "Reviewed against available evidence"}
+									</summary>
+									<p className="mt-1">
+										{message.toolData.validation.note ||
+											"Review checks support in the available sources; it does not guarantee factual accuracy."}
+									</p>
+								</details>
+							) : null}
 							{isAssistant && message.reasoning ? (
 								<div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
 									<button
