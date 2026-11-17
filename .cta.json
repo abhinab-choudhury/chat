@@ -27,7 +27,6 @@
     "shadcn",
     "t3env",
     "better-auth",
-    "posthog",
     "tanstack-query",
     "ai",
     "store"

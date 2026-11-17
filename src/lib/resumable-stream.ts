@@ -49,3 +49,28 @@ export function getResumableStreamContext() {
 		return null;
 	}
 }
+
+// A short lease distinguishes a live producer from Redis replay left by a dead process.
+const generationLeaseKey = (streamId: string) => `chat:generation:${streamId}`;
+export async function hasGenerationLease(
+	streamId: string,
+): Promise<boolean | null> {
+	if (!getResumableStreamContext() || !publisher) return null;
+	return (await publisher.exists(generationLeaseKey(streamId))) === 1;
+}
+export async function trackGeneration(streamId: string) {
+	if (!getResumableStreamContext() || !publisher) return async () => {};
+	const redis = publisher;
+	const key = generationLeaseKey(streamId);
+	await redis.set(key, "active", "EX", 30);
+	const timer = setInterval(() => {
+		void redis
+			.set(key, "active", "EX", 30)
+			.catch((error) => console.error("[stream] lease refresh failed", error));
+	}, 10000);
+	timer.unref();
+	return async () => {
+		clearInterval(timer);
+		await redis.del(key);
+	};
+}

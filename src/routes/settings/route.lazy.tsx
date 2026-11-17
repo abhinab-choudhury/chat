@@ -11,23 +11,14 @@ import {
 	Bot,
 	Box,
 	Globe,
-	Key,
 	PaintBucket,
-	Search,
-	User,
 } from "lucide-react";
 import * as React from "react";
 import { RouteErrorComponent } from "#/components/route-error";
-import { SettingsLayout } from "#/components/settings/settings-layout";
 import { Button } from "#/components/ui/button";
-import { Skeleton } from "#/components/ui/skeleton";
-import { useSession } from "#/hooks/auth-hooks";
 import { cn } from "#/lib/utils";
 
 const settingsNavItems = [
-	{ title: "Profile", href: "/settings/profile", icon: User },
-	{ title: "AI Provider", href: "/settings/api-keys", icon: Key },
-	{ title: "Web Search", href: "/settings/web-search", icon: Search },
 	{ title: "Models", href: "/settings/models", icon: Box },
 	{ title: "AI Options", href: "/settings/ai-options", icon: Bot },
 	{ title: "Features", href: "/settings/features", icon: Globe },
@@ -40,53 +31,16 @@ export const Route = createLazyFileRoute("/settings")({
 	errorComponent: RouteErrorComponent,
 });
 
-function Inner() {
-	const { user, isPending } = useSession();
-
-	if (isPending) {
-		return (
-			<SettingsLayout
-				title="Settings"
-				description="Manage your account preferences and configuration."
-			>
-				<Skeleton className="h-10 w-full" />
-			</SettingsLayout>
-		);
-	}
-
-	if (!user) {
-		return (
-			<SettingsLayout
-				title="Settings"
-				description="Manage your account preferences and configuration."
-			>
-				<p className="text-sm text-muted-foreground">
-					Sign in to manage your settings.
-				</p>
-			</SettingsLayout>
-		);
-	}
-
-	return <Outlet />;
-}
-
 function SettingsPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { user, isPending } = useSession();
-
-	React.useEffect(() => {
-		if (!isPending && !user) {
-			void navigate({ to: "/login" });
-		}
-	}, [isPending, user, navigate]);
 
 	React.useEffect(() => {
 		if (
 			location.pathname === "/settings" ||
 			location.pathname === "/settings/"
 		) {
-			void navigate({ to: "/settings/profile", replace: true });
+			void navigate({ to: "/settings/models", replace: true });
 		}
 	}, [location.pathname, navigate]);
 
@@ -110,7 +64,7 @@ function SettingsPage() {
 					<div className="space-y-1">
 						<h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
 						<p className="text-muted-foreground">
-							Manage your account preferences and configuration.
+							Manage your preferences and configuration.
 						</p>
 					</div>
 				</div>
@@ -142,7 +96,7 @@ function SettingsPage() {
 
 					<div className="col-span-3 flex-1">
 						<div className="space-y-6 p-0.5 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto">
-							<Inner />
+							<Outlet />
 						</div>
 					</div>
 				</div>

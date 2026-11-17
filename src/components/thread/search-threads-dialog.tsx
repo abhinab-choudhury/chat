@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+// convex removed
 import {
 	CornerDownLeftIcon,
 	MessageSquareIcon,
@@ -17,11 +17,9 @@ import {
 	CommandSeparator,
 } from "#/components/ui/command";
 import { Kbd, KbdGroup } from "#/components/ui/kbd";
-import { useSession } from "#/hooks/auth-hooks";
+import { chatData, type Thread } from "#/lib/chat-data";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useSearchStore } from "#/store/search-store";
-import { api } from "../../../convex/_generated/api";
-import type { Doc } from "../../../convex/_generated/dataModel";
 
 const DEBOUNCE_MS = 180;
 const RESULT_LIMIT = 20;
@@ -55,12 +53,11 @@ export function SearchThreadsDialog() {
 	const navigate = useNavigate();
 	const open = useSearchStore((state) => state.open);
 	const setOpen = useSearchStore((state) => state.setOpen);
-	const { user, isPending } = useSession();
-	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
+	const userId = getCurrentUserId();
 
 	const [query, setQuery] = React.useState("");
 	const [debouncedQuery, setDebouncedQuery] = React.useState("");
-	const [results, setResults] = React.useState<Doc<"threads">[]>([]);
+	const [results, setResults] = React.useState<Thread[]>([]);
 
 	React.useEffect(() => {
 		const timer = window.setTimeout(
@@ -70,16 +67,15 @@ export function SearchThreadsDialog() {
 		return () => window.clearTimeout(timer);
 	}, [query]);
 
-	const data = useQuery(
-		api.threads.searchThreads,
-		userId && open
-			? { userId, query: debouncedQuery, limit: RESULT_LIMIT }
-			: "skip",
-	);
-
 	React.useEffect(() => {
-		if (data) setResults(data);
-	}, [data]);
+		if (!userId || !open) return;
+		const data = chatData.searchThreads({
+			userId,
+			query: debouncedQuery,
+			limit: RESULT_LIMIT,
+		});
+		setResults(data as Thread[]);
+	}, [userId, open, debouncedQuery]);
 
 	React.useEffect(() => {
 		if (!open) {
@@ -91,7 +87,7 @@ export function SearchThreadsDialog() {
 
 	const searching = debouncedQuery.trim().length > 0;
 	const hasQuery = query.trim().length > 0;
-	const loading = userId !== null && data === undefined;
+	const loading = false;
 
 	const handleSelectThread = (threadId: string) => {
 		setOpen(false);

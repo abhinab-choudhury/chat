@@ -1,8 +1,5 @@
-import { BraveSearchAdapter } from "./brave-search-adapter";
-import { FirecrawlSearchAdapter } from "./firecrawl-search-adapter";
 import { isSearchProviderType } from "./provider-catalog";
 import { SerperSearchAdapter } from "./serper-search-adapter";
-import { TavilySearchAdapter } from "./tavily-search-adapter";
 import type {
 	SearchAdapter,
 	SearchOptions,
@@ -15,21 +12,13 @@ function createAdapter(
 	apiKey: string,
 ): SearchAdapter {
 	switch (provider) {
-		case "firecrawl":
-			return new FirecrawlSearchAdapter({ apiKey });
-		case "brave":
-			return new BraveSearchAdapter({ apiKey });
-		case "tavily":
-			return new TavilySearchAdapter({ apiKey });
 		case "serper":
 			return new SerperSearchAdapter({ apiKey });
 	}
 }
 
 /**
- * Factory over the search provider adapters. The provider and key are supplied
- * by the user's encrypted BYOK configuration, so the factory never falls back
- * to server environment variables.
+ * Serper search configured with a server-side API key.
  */
 export class SearchProvider {
 	private adapter: SearchAdapter;
@@ -41,7 +30,7 @@ export class SearchProvider {
 		const resolvedKey = apiKey?.trim();
 		if (!resolvedKey) {
 			throw new Error(
-				`No ${provider} API key configured. Add one in Settings → Web Search.`,
+				`No ${provider} API key configured. Set SERPER_API_KEY on the server.`,
 			);
 		}
 		this.adapter = createAdapter(provider, resolvedKey);
@@ -51,6 +40,24 @@ export class SearchProvider {
 		query: string,
 		options: SearchOptions = {},
 	): Promise<SearchResult[]> {
-		return await this.adapter.search(query, options);
+		const maxAttempts = 3;
+		let lastError: unknown;
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			try {
+				return await this.adapter.search(query, options);
+			} catch (error) {
+				lastError = error;
+				const message = error instanceof Error ? error.message : String(error);
+				const isRateLimited =
+					/\b429\b/.test(message) ||
+					/rate.?limit/i.test(message) ||
+					/too many requests/i.test(message);
+				if (!isRateLimited || attempt === maxAttempts - 1) throw error;
+				const delay = 500 * 2 ** attempt;
+				await new Promise((resolve) => setTimeout(resolve, delay));
+				if (options.signal?.aborted) throw error;
+			}
+		}
+		throw lastError;
 	}
 }

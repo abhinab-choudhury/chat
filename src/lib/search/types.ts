@@ -1,4 +1,4 @@
-export type SearchProviderType = "firecrawl" | "brave" | "tavily" | "serper";
+export type SearchProviderType = "serper";
 
 export interface SearchResult {
 	url: string;
@@ -47,8 +47,14 @@ export interface WebSearchToolCall {
 
 /** Tool data persisted alongside an assistant message. */
 export interface WebSearchToolData {
+	memories?: {
+		id: string;
+		threadId: string;
+		question: string;
+		questionAt: number;
+	}[];
 	validation?: {
-		status: "supported" | "qualified";
+		status: "supported" | "qualified" | "blocked";
 		note: string;
 		checkedAt: number;
 	};

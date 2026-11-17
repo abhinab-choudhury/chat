@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDownIcon } from "lucide-react";
+import { AlertCircle, ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 import { ChatInput } from "#/components/chat/chat-input";
 import { ChatMessageItem } from "#/components/chat/chat-message";
 import { StreamingMessage } from "#/components/chat/streaming-message";
 import { RouteErrorComponent } from "#/components/route-error";
+import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import {
 	MessageScroller,
@@ -16,12 +17,8 @@ import {
 } from "#/components/ui/message-scroller";
 import { useThreadChat } from "#/hooks/use-thread-chat";
 import { agentPhases } from "#/lib/agent/progress";
-import type { Id } from "../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/_chat/thread/$threadId")({
-	// SSR-friendly route boundary: validates params and enables streamed shell rendering.
-	// Authenticated Convex data is reconciled client-side via reactive queries; public
-	// prefetch/SSR can be layered here with server-side Convex fetching when safe.
 	loader: async ({ params }) => {
 		return { threadId: params.threadId };
 	},
@@ -31,12 +28,10 @@ export const Route = createFileRoute("/_chat/thread/$threadId")({
 
 function RouteComponent() {
 	const { threadId: rawThreadId } = Route.useParams();
-	const threadId = rawThreadId as Id<"threads">;
+	const threadId = rawThreadId as string;
 
 	const chat = useThreadChat(threadId);
 	const {
-		isPending,
-		currentUserId,
 		thread,
 		canView,
 		isOwner,
@@ -56,42 +51,42 @@ function RouteComponent() {
 	} = chat;
 
 	const viewportRef = React.useRef<HTMLDivElement>(null);
+	const followStreamRef = React.useRef(true);
 	const [showScrollButton, setShowScrollButton] = React.useState(false);
 
 	React.useEffect(() => {
-		if (isPending || !canView) return;
+		if (!canView) return;
 		const el = viewportRef.current;
 		if (!el) return;
 		const check = () => {
 			const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 96;
 			setShowScrollButton(!atBottom);
 		};
-		el.addEventListener("scroll", check, { passive: true });
+		const onScroll = () => {
+			followStreamRef.current =
+				el.scrollTop + el.clientHeight >= el.scrollHeight - 96;
+			check();
+		};
+		el.addEventListener("scroll", onScroll, { passive: true });
 		check();
 		const observer = new ResizeObserver(check);
 		observer.observe(el);
 		if (el.firstElementChild) observer.observe(el.firstElementChild);
 		return () => {
 			observer.disconnect();
-			el.removeEventListener("scroll", check);
+			el.removeEventListener("scroll", onScroll);
 		};
-	}, [isPending, canView]);
+	}, [canView]);
 
-	if (isPending) {
-		return (
-			<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-				Loading…
-			</div>
-		);
-	}
-
-	if (currentUserId === null) {
-		return (
-			<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-				Please sign in to view this thread.
-			</div>
-		);
-	}
+	React.useEffect(() => {
+		if (!followStreamRef.current) return;
+		const frame = requestAnimationFrame(() => {
+			const viewport = viewportRef.current;
+			if (viewport && followStreamRef.current)
+				viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [streamingText, streamingReasoning]);
 
 	if (thread === undefined) {
 		return (
@@ -109,8 +104,7 @@ function RouteComponent() {
 	}
 
 	const isStreaming = Boolean(
-		(busy || pendingAutoSend) &&
-			(streamingReasoning || streamingText || streamingToolCalls.length > 0),
+		streamingReasoning || streamingText || streamingToolCalls.length > 0,
 	);
 	const isThinkingOnly = Boolean(
 		(busy || pendingAutoSend) &&
@@ -129,9 +123,13 @@ function RouteComponent() {
 					>
 						<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
 							{chatError ? (
-								<div role="alert" className="text-sm text-destructive">
-									{chatError}
-								</div>
+								<Alert variant="destructive">
+									<AlertCircle aria-hidden="true" />
+									<AlertTitle>Response could not be completed</AlertTitle>
+									<AlertDescription>
+										<p className="break-words">{chatError}</p>
+									</AlertDescription>
+								</Alert>
 							) : null}
 							{displayMessages.map((m) => (
 								<ChatMessageItem

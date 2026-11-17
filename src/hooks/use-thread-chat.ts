@@ -1,8 +1,13 @@
-import { useMutation } from "convex/react";
 import * as React from "react";
-import { useSession } from "#/hooks/auth-hooks";
 import type { AgentPhase } from "#/lib/agent/progress";
-import { useDiskCachedQuery } from "#/lib/convex-cached-query";
+import {
+	chatData,
+	type Message,
+	refreshChats,
+	type Thread,
+	useMessages,
+	useThread,
+} from "#/lib/chat-data";
 import {
 	readCachedMessages,
 	writeCachedMessages,
@@ -12,8 +17,6 @@ import { consumeChatStream } from "#/lib/stream-reader";
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
-import { api } from "../../convex/_generated/api";
-import type { Doc, Id } from "../../convex/_generated/dataModel";
 
 export interface ChatMessage {
 	_id: string;
@@ -25,9 +28,8 @@ export interface ChatMessage {
 }
 
 export interface UseThreadChatResult {
-	isPending: boolean;
 	currentUserId: string | null;
-	thread: Doc<"threads"> | null | undefined;
+	thread: Thread | null | undefined;
 	canView: boolean;
 	isOwner: boolean;
 	messages: ChatMessage[] | undefined;
@@ -53,84 +55,35 @@ export interface UseThreadChatResult {
  * streaming, auto-send, and stream resume. Route components stay thin and
  * presentational.
  */
-export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
-	const { user, isPending } = useSession();
-	const currentUserId = isPending ? null : (user?.id ?? getCurrentUserId(null));
+export function useThreadChat(threadId: string): UseThreadChatResult {
+	const currentUserId = getCurrentUserId();
 
-	const thread = useDiskCachedQuery(
-		api.threads.getThread,
-		{
-			key: `thread:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined,
-		},
-		{ threadId, userId: currentUserId ?? undefined },
-	);
+	const thread = useThread(threadId);
 	const canView =
 		!!thread &&
 		!!currentUserId &&
 		(thread.userId === currentUserId || !!thread.isPublic);
-	const messages = useDiskCachedQuery(
-		api.messages.getMessages,
-		{
-			key: `messages:${threadId}:${currentUserId ?? "anon"}`,
-			default: undefined,
-		},
-		canView ? { threadId, userId: currentUserId ?? undefined } : "skip",
-	);
+	const messagesFromStore = useMessages(threadId);
+	const messages = canView
+		? (messagesFromStore as unknown as ChatMessage[])
+		: undefined;
 
 	// Best-effort local cache of finalized messages for instant paints.
 	React.useEffect(() => {
 		if (messages && messages.length > 0) {
 			writeCachedMessages(
 				threadId,
-				messages.map(
-					(m: {
-						_id: string;
-						role: string;
-						content: string;
-						reasoning?: string;
-						toolData?: WebSearchToolData;
-						createdAt?: number;
-					}) => ({
-						_id: String(m._id),
-						role: m.role,
-						content: m.content,
-						reasoning: m.reasoning,
-						toolData: m.toolData,
-						createdAt: m.createdAt,
-					}),
-				),
+				(messages as unknown as Message[]).map((m) => ({
+					_id: String(m._id),
+					role: m.role,
+					content: m.content,
+					reasoning: m.reasoning,
+					toolData: m.toolData,
+					createdAt: m.createdAt,
+				})),
 			);
 		}
 	}, [messages, threadId]);
-
-	const send = useMutation(api.messages.sendMessage).withOptimisticUpdate(
-		(localStore, args) => {
-			const queryArgs = {
-				threadId: args.threadId,
-				userId: args.userId,
-			};
-			const current = localStore.getQuery(api.messages.getMessages, queryArgs);
-			if (current !== undefined) {
-				localStore.setQuery(api.messages.getMessages, queryArgs, [
-					...current,
-					{
-						_id: crypto.randomUUID() as unknown as (typeof current)[number]["_id"],
-						_creationTime: Date.now(),
-						threadId: args.threadId,
-						role: args.role,
-						content: args.content,
-						reasoning: args.reasoning,
-						toolData: args.toolData,
-						authorId: args.authorId ?? args.userId,
-						clientUuid: args.clientUuid,
-						createdAt: Date.now(),
-						isStreaming: args.isStreaming,
-					},
-				]);
-			}
-		},
-	);
 
 	const input = useChatStore((s) => s.input);
 	const setInput = useChatStore((s) => s.setInput);
@@ -196,6 +149,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 
 	const handleSubmit = React.useCallback(
 		async (override?: string, sendUser: boolean = true) => {
+			if (thread?.isLive) return;
 			const trimmed = (override ?? input).trim();
 			if (sendUser) {
 				if (!trimmed || busy || !isOwner || sendingRef.current) return;
@@ -209,7 +163,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			if (sendUser && !override) setInput("");
 			try {
 				if (sendUser && trimmed) {
-					await send({
+					await chatData.sendMessage({
 						clientUuid: crypto.randomUUID(),
 						threadId,
 						role: "user",
@@ -228,7 +182,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 						: baseHistory;
 
 				// Optimistic path: on first auto-send, include the pending initial
-				// message if it hasn't appeared in the Convex query yet.
+				// message if it has not loaded yet.
 				if (!sendUser && pendingInitialMessage) {
 					const hasPending = baseHistory.some(
 						(m) => m.role === "user" && m.content === pendingInitialMessage,
@@ -243,6 +197,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 				}
 
 				const streamId = crypto.randomUUID();
+				resumedRef.current = true;
 
 				setStreamingText("");
 				setStreamingReasoning("");
@@ -285,6 +240,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 					onStatus: setAgentPhase,
 				});
 
+				await refreshChats(threadId);
 				setStreamingText("");
 				setStreamingReasoning("");
 				setStreamingToolCalls([]);
@@ -305,9 +261,9 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		},
 		[
 			input,
+			thread?.isLive,
 			busy,
 			messages,
-			send,
 			threadId,
 			selectedModel,
 			webSearchEnabled,
@@ -343,6 +299,9 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			return;
 		if (busy || sendingRef.current) return;
 		resumedRef.current = true;
+		sendingRef.current = true;
+		const controller = new AbortController();
+		abortRef.current = controller;
 		setBusy(true);
 		setStreamingText("");
 		setStreamingReasoning("");
@@ -354,8 +313,10 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 				});
 				const res = await fetch(
 					`/api/chat/${thread.currentStreamId}/stream?${params.toString()}`,
+					{ signal: controller.signal },
 				);
 				if (res.status === 204 || !res.ok || !res.body) {
+					await refreshChats(threadId);
 					return;
 				}
 				await consumeChatStream(res.body, {
@@ -365,16 +326,22 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 					onStatus: setAgentPhase,
 				});
 
+				await refreshChats(threadId);
 				setStreamingText("");
 				setStreamingReasoning("");
 				setStreamingToolCalls([]);
 			} catch (e) {
+				if (controller.signal.aborted) return;
 				setChatError(
 					e instanceof Error ? e.message : "Unable to resume the response.",
 				);
 				console.error(e);
 			} finally {
-				setBusy(false);
+				if (abortRef.current === controller) {
+					abortRef.current = null;
+					sendingRef.current = false;
+					setBusy(false);
+				}
 			}
 		})();
 	}, [
@@ -394,7 +361,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 			reasoning?: string;
 			toolData?: WebSearchToolData;
 		}>;
-		const list: ChatMessage[] = source.map((m) => ({
+		const list: ChatMessage[] = (source as any[]).map((m: any) => ({
 			_id: String(m._id),
 			role: m.role,
 			content: m.content,
@@ -418,7 +385,6 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 	}, [messages, threadId, pendingInitialMessage]);
 
 	return {
-		isPending,
 		currentUserId,
 		thread,
 		canView,
@@ -427,7 +393,7 @@ export function useThreadChat(threadId: Id<"threads">): UseThreadChatResult {
 		displayMessages,
 		input,
 		setInput,
-		busy,
+		busy: busy || !!thread?.isLive,
 		pendingAutoSend,
 		streamingText,
 		agentPhase,

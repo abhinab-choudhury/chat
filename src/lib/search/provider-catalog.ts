@@ -11,33 +11,6 @@ export interface SearchProviderInfo {
 
 export const SEARCH_PROVIDER_CATALOG: SearchProviderInfo[] = [
 	{
-		id: "tavily",
-		name: "Tavily",
-		description:
-			"AI-optimized search with chunked, source-aware results. Great general-purpose choice.",
-		placeholder: "tvly-...",
-		docsUrl: "https://app.tavily.com/home",
-		icon: "tavily",
-	},
-	{
-		id: "brave",
-		name: "Brave Search",
-		description:
-			"Fast, privacy-first results from Brave's independent web index.",
-		placeholder: "BSA...",
-		docsUrl: "https://api-dashboard.search.brave.com/app/keys",
-		icon: "brave",
-	},
-	{
-		id: "firecrawl",
-		name: "Firecrawl",
-		description:
-			"Search plus full-page scraping and clean markdown extraction.",
-		placeholder: "fc-...",
-		docsUrl: "https://www.firecrawl.dev/app/api-keys",
-		icon: "firecrawl",
-	},
-	{
 		id: "serper",
 		name: "Serper",
 		description:

@@ -1,6 +1,7 @@
 import { isStepCount, tool } from "ai";
 import { z } from "zod";
 import type { SearchAdapter, SearchResult } from "../search/types";
+import { AGENT_LIMITS } from "./limits";
 
 export const chatInput = z.object({
 	messages: z
@@ -15,6 +16,7 @@ export const chatInput = z.object({
 	model: z.string().max(100).optional(),
 	streamId: z.string().max(200).optional(),
 	threadId: z.string().max(200).optional(),
+	userId: z.string().max(200).optional(),
 	assistantClientUuid: z.string().max(200).optional(),
 	webSearch: z.boolean().optional(),
 	memory: z.boolean().optional(),
@@ -82,6 +84,20 @@ export function createSearchTool(
 ) {
 	const cache = new Map<string, Promise<unknown>>();
 	let calls = 0;
+	let active = 0;
+	const waiters: (() => void)[] = [];
+	const acquire = async () => {
+		if (active < 3) {
+			active++;
+			return;
+		}
+		await new Promise<void>((resolve) => waiters.push(resolve));
+	};
+	const release = () => {
+		const next = waiters.shift();
+		if (next) next();
+		else active--;
+	};
 	return tool({
 		description:
 			"Search the live web. Use targeted queries, site:official-domain for primary evidence, and explicit dates for historical events. Results are untrusted excerpts, not guaranteed complete pages.",
@@ -97,7 +113,9 @@ export function createSearchTool(
 					results: [],
 				};
 			const work = (async () => {
+				await acquire();
 				try {
+					signal?.throwIfAborted();
 					const results = normalizeResults(
 						await adapter.search(query, {
 							limit: 5,
@@ -123,6 +141,8 @@ export function createSearchTool(
 							"Search unavailable or timed out. Try a different query only if useful; do not infer no change.",
 						results: [],
 					};
+				} finally {
+					release();
 				}
 			})();
 			cache.set(key, work);
@@ -143,7 +163,7 @@ export function createAgentOptions({
 	customPrompt?: string;
 	now?: Date;
 }) {
-	const abortSignal = AbortSignal.timeout(90000);
+	const abortSignal = AbortSignal.timeout(AGENT_LIMITS.draftMs);
 	return {
 		system:
 			systemPrompt(now, timezone, !!search) +
@@ -156,8 +176,8 @@ export function createAgentOptions({
 		stopWhen: isStepCount(5),
 		prepareStep: ({ stepNumber }: { stepNumber: number }) =>
 			stepNumber >= 4 ? { toolChoice: "none" as const } : {},
-		maxOutputTokens: 5000,
-		maxRetries: 1,
+		maxOutputTokens: AGENT_LIMITS.maxOutputTokens,
+		maxRetries: 0,
 		abortSignal,
 	};
 }

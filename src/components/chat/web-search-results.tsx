@@ -1,5 +1,12 @@
-import { ChevronDown, ExternalLink, Globe, Loader2 } from "lucide-react";
+import {
+	AlertTriangle,
+	ChevronDown,
+	ExternalLink,
+	Globe,
+	Loader2,
+} from "lucide-react";
 import * as React from "react";
+import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import type { WebSearchToolCall } from "#/lib/search/types";
 import { cn } from "#/lib/utils";
 
@@ -74,9 +81,7 @@ export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 						<Globe className="size-4 text-primary" />
 					)}
 					<span className="font-medium text-primary">Web Search</span>
-					{call.error ? (
-						<span className="text-muted-foreground text-xs">{call.error}</span>
-					) : null}
+
 					<div className="flex-1 md:hidden" />
 					{hasResults && (
 						<div
@@ -119,6 +124,15 @@ export function WebSearchResults({ call }: { call: WebSearchToolCall }) {
 				) : null}
 			</button>
 
+			{call.error ? (
+				<Alert variant="warning" className="my-2">
+					<AlertTriangle aria-hidden="true" />
+					<AlertTitle>Search could not be completed</AlertTitle>
+					<AlertDescription>
+						<p>{call.error}</p>
+					</AlertDescription>
+				</Alert>
+			) : null}
 			{expanded && hasResults ? (
 				<div className="my-4 overflow-hidden rounded-lg border bg-muted/50">
 					<div className="flex gap-4 overflow-x-auto p-4">

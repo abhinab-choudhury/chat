@@ -3,15 +3,13 @@ import type { SearchProviderType } from "./search/types";
 export interface PublicSearchProviderStatus {
 	id: SearchProviderType;
 	configured: boolean;
-	keyHint: string | null;
 }
 
 export interface PublicUserSettings {
-	onboardingCompleted: boolean;
 	hasGeminiKey: boolean;
-	geminiKeyHint: string | null;
+	hasOpenAIKey: boolean;
 	defaultSearchProvider: SearchProviderType | null;
 	searchProviders: PublicSearchProviderStatus[];
-	/** True when the Convex agent bridge is configured. */
+	/** Whether persistent agent memory is available. */
 	memoryAvailable: boolean;
 }

@@ -29,13 +29,15 @@ function ModelsSettings() {
 	return (
 		<SettingsLayout
 			title="Models"
-			description="Choose the default model used for new conversations."
+			description="Choose Gemini or OpenAI for answers and tool calling."
 		>
 			<Card>
 				<CardHeader>
 					<CardTitle>Default model</CardTitle>
 					<CardDescription>
-						Choose the model used for new conversations.
+						GPT-5.6 Luna is the inexpensive testing default. Configure
+						OPENAI_API_KEY or GEMINI_API_KEY on the server for the selected
+						provider.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">

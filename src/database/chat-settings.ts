@@ -1,19 +1,10 @@
 import { boolean, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-import { user } from "./auth-schema";
-
-/**
- * Per-user BYOK configuration.
- *
- * Provider secrets are encrypted before they are written here (see
- * `src/lib/secrets.server.ts`) and are never returned to the browser. Only
- * derived status (configured / not configured) is exposed through the
- * settings API.
+/** Legacy provider settings table, retained for existing database migrations.
+ * Runtime credentials now come exclusively from the server environment.
  */
 export const userSettings = pgTable("user_settings", {
-	userId: text("user_id")
-		.primaryKey()
-		.references(() => user.id, { onDelete: "cascade" }),
+	userId: text("user_id").primaryKey(),
 	geminiKey: text("gemini_key"),
 	defaultSearchProvider: text("default_search_provider"),
 	// Encrypted keys keyed by search provider id.

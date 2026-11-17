@@ -10,7 +10,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Alert text colors are independent of destructive button fills. */
 :root {
+  --error-surface: #fff1f2;
+  --error-text: #881337;
+  --error-border: #fda4af;
+  --warning-surface: #fffbeb;
+  --warning-text: #78350f;
+  --warning-border: #fcd34d;
   --background: oklch(0.9911 0 0);
   --foreground: oklch(0.2046 0 0);
   --card: oklch(0.9911 0 0);
@@ -29,7 +36,7 @@
   --destructive-foreground: oklch(0.9934 0.0032 17.2118);
   --border: oklch(0.9037 0 0);
   --input: oklch(0.9731 0 0);
-  --ring: oklch(0.8348 0.1302 160.9080);
+  --ring: var(--primary);
   --chart-1: oklch(0.8348 0.1302 160.9080);
   --chart-2: oklch(0.6231 0.1880 259.8145);
   --chart-3: oklch(0.6056 0.2189 292.7172);
@@ -42,7 +49,7 @@
   --sidebar-accent: oklch(0.9461 0 0);
   --sidebar-accent-foreground: oklch(0.2435 0 0);
   --sidebar-border: oklch(0.9037 0 0);
-  --sidebar-ring: oklch(0.8348 0.1302 160.9080);
+  --sidebar-ring: var(--primary);
   --font-sans: Outfit, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: monospace;
@@ -66,6 +73,12 @@
 }
 
 .dark {
+  --error-surface: #2b151c;
+  --error-text: #fda4af;
+  --error-border: #9f1239;
+  --warning-surface: #2a2110;
+  --warning-text: #fde68a;
+  --warning-border: #92400e;
   --background: oklch(0.1822 0 0);
   --foreground: oklch(0.9288 0.0126 255.5078);
   --card: oklch(0.2046 0 0);
@@ -84,7 +97,7 @@
   --destructive-foreground: oklch(0.9368 0.0045 34.3092);
   --border: oklch(0.2809 0 0);
   --input: oklch(0.2603 0 0);
-  --ring: oklch(0.8003 0.1821 151.7110);
+  --ring: var(--primary);
   --chart-1: oklch(0.8003 0.1821 151.7110);
   --chart-2: oklch(0.7137 0.1434 254.6240);
   --chart-3: oklch(0.7090 0.1592 293.5412);
@@ -97,7 +110,7 @@
   --sidebar-accent: oklch(0.3132 0 0);
   --sidebar-accent-foreground: oklch(0.9851 0 0);
   --sidebar-border: oklch(0.2809 0 0);
-  --sidebar-ring: oklch(0.8003 0.1821 151.7110);
+  --sidebar-ring: var(--primary);
   --font-sans: Outfit, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: monospace;
@@ -119,6 +132,12 @@
 }
 
 @theme inline {
+  --color-error-surface: var(--error-surface);
+  --color-error-text: var(--error-text);
+  --color-error-border: var(--error-border);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-text: var(--warning-text);
+  --color-warning-border: var(--warning-border);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

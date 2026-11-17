@@ -1,60 +1,141 @@
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import type { z } from "zod";
-import { auth } from "../auth";
-import { getDecryptedUserSettings } from "../user-settings.server";
-import { signEnvelope } from "./bridge";
+import { db } from "#/database";
+import { chatMessages, chatThreads } from "#/database/chats";
+import { agentRuns } from "#/database/memory";
+import {
+	finishStream,
+	ownedThread,
+	recoverAbandonedStream,
+	requestUserId,
+} from "../chat-persistence.server";
+import { startMemoryWorker } from "../memory/worker.server";
+import {
+	getResumableStreamContext,
+	trackGeneration,
+} from "../resumable-stream";
 import type { chatInput } from "./core";
+import { openDirectStream } from "./direct.server";
+import { requireModelCredentials } from "./provider.server";
 import { ChatTransportError } from "./transport";
 
 export type ChatRequest = z.infer<typeof chatInput>;
 
-/** Resolve the authenticated user's credentials and open the signed Convex request. */
+/** Resolve credentials and open a direct chat stream (convex removed). */
 export async function openAgentStream(
 	request: Request,
 	body: ChatRequest,
 ): Promise<ReadableStream<Uint8Array>> {
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (!session?.user.id) throw new ChatTransportError("Please sign in again.");
-	const secrets = await getDecryptedUserSettings(session.user.id);
-	if (!secrets.geminiKey)
+	const userId = requestUserId(request);
+	try {
+		requireModelCredentials(body.model);
+	} catch (error) {
 		throw new ChatTransportError(
-			"Add your Gemini key in Settings → AI Provider.",
+			error instanceof Error
+				? error.message
+				: "Model configuration unavailable.",
 		);
-	const site = process.env.VITE_CONVEX_SITE_URL;
-	const secret = process.env.AGENT_BRIDGE_SECRET;
-	if (!site || !secret)
-		throw new ChatTransportError("The Convex agent bridge is not configured.");
-	const question = [...body.messages]
-		.reverse()
-		.find((message) => message.role === "user")?.content;
-	if (!question) throw new ChatTransportError("A user question is required.");
-	const payload = JSON.stringify({
-		expiresAt: Date.now() + 60000,
-		userId: session.user.id,
-		threadId: body.threadId,
-		requestId: body.streamId,
-		question,
-		timezone: body.timezone,
-		model: body.model || "gemini-3.5-flash-lite",
-		memory: body.memory ?? true,
-		reasoningEffort: body.reasoningEffort ?? "medium",
-		geminiKey: secrets.geminiKey,
-		search:
-			body.webSearch && secrets.search
-				? { provider: secrets.search.provider, apiKey: secrets.search.apiKey }
-				: null,
-	});
-	const response = await fetch(`${site.replace(/\/$/, "")}/agent/chat`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"X-Agent-Signature": await signEnvelope(payload, secret),
-		},
-		body: payload,
-		signal: AbortSignal.timeout(140000),
-	});
-	if (!response.ok || !response.body)
+	}
+	if (!body.threadId || !body.streamId)
+		throw new ChatTransportError("Chat not found.");
+	const thread = await ownedThread(body.threadId, userId);
+	if (!thread) throw new ChatTransportError("Chat not found.");
+	startMemoryWorker();
+	const [prior] = await db
+		.select()
+		.from(agentRuns)
+		.where(
+			and(
+				eq(agentRuns.id, body.streamId),
+				eq(agentRuns.threadId, body.threadId),
+			),
+		);
+	if (prior?.state === "complete" && prior.answerId) {
+		const [answer] = await db
+			.select()
+			.from(chatMessages)
+			.where(eq(chatMessages.id, prior.answerId));
+		if (answer)
+			return new ReadableStream({
+				start(controller) {
+					controller.enqueue(
+						new TextEncoder().encode(
+							`${JSON.stringify({ t: "t", d: answer.content })}\n{"t":"e"}\n`,
+						),
+					);
+					controller.close();
+				},
+			});
+	}
+	if (prior && ["failed", "cancelled"].includes(prior.state))
 		throw new ChatTransportError(
-			"The Convex agent is unavailable. Please retry.",
+			"This request has ended. Submit a new request to retry.",
 		);
-	return response.body;
+
+	const existing = await recoverAbandonedStream(thread);
+	if (existing.currentStreamId) {
+		const replay = await getResumableStreamContext()?.resumeExistingStream(
+			existing.currentStreamId,
+		);
+		if (replay) return replay.pipeThrough(new TextEncoderStream());
+		throw new ChatTransportError("A response is already running in this chat.");
+	}
+	const claimed = await db
+		.update(chatThreads)
+		.set({ currentStreamId: body.streamId, streamStartedAt: Date.now() })
+		.where(
+			and(
+				eq(chatThreads.id, body.threadId),
+				or(
+					isNull(chatThreads.currentStreamId),
+					lt(chatThreads.streamStartedAt, Date.now() - 6 * 60 * 1000),
+				),
+			),
+		)
+		.returning({ id: chatThreads.id });
+	if (!claimed.length) {
+		const winner = await ownedThread(body.threadId, userId);
+		if (winner?.currentStreamId) {
+			const replay = await getResumableStreamContext()?.resumeExistingStream(
+				winner.currentStreamId,
+			);
+			if (replay) return replay.pipeThrough(new TextEncoderStream());
+		}
+		throw new ChatTransportError("A response is already running in this chat.");
+	}
+	// Persist userId on body for downstream use.
+	body.userId = userId;
+	let stopLease: (() => Promise<void>) | undefined;
+	try {
+		stopLease = await trackGeneration(body.streamId);
+		const upstream = await openDirectStream(request, body);
+		const reader = upstream.getReader();
+		return new ReadableStream<Uint8Array>({
+			async start(controller) {
+				try {
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						controller.enqueue(value);
+					}
+					controller.close();
+				} catch (error) {
+					controller.error(error);
+				} finally {
+					reader.releaseLock();
+					await stopLease?.().catch(console.error);
+				}
+			},
+		});
+	} catch (error) {
+		await stopLease?.().catch(console.error);
+		await finishStream({
+			threadId: body.threadId,
+			streamId: body.streamId,
+			text: "",
+			reasoning: "",
+			toolData: null,
+		});
+		throw error;
+	}
 }

@@ -1,4 +1,5 @@
-import { useMutation } from "convex/react";
+import { Link } from "@tanstack/react-router";
+// convex removed
 import {
 	CheckIcon,
 	ChevronDownIcon,
@@ -15,9 +16,8 @@ import { Button } from "#/components/ui/button";
 import { Message, MessageContent } from "#/components/ui/message";
 import { MessageScrollerItem } from "#/components/ui/message-scroller";
 import type { ChatMessage } from "#/hooks/use-thread-chat";
+import { chatData } from "#/lib/chat-data";
 import { cn } from "#/lib/utils";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 
 interface ChatMessageItemProps {
 	message: ChatMessage;
@@ -31,7 +31,8 @@ interface ChatMessageItemProps {
  * copy feedback, thinking expansion) is local to this item.
  */
 export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
-	const updateMessage = useMutation(api.messages.updateMessage);
+	const updateMessage = (args: { messageId: string; content: string }) =>
+		chatData.updateMessage(args);
 
 	const isUser = message.role === "user";
 	const isAssistant = message.role === "assistant";
@@ -56,7 +57,7 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 		const trimmed = editingText.trim();
 		if (!trimmed) return;
 		await updateMessage({
-			messageId: message._id as Id<"messages">,
+			messageId: message._id,
 			content: trimmed,
 		});
 		setEditing(false);
@@ -117,8 +118,35 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 								(message.toolData?.webSearches ?? []).map((call) => (
 									<WebSearchResults key={call.id ?? call.query} call={call} />
 								))}
-							{isAssistant && message.toolData?.validation ? (
+							{isAssistant && !!message.toolData?.memories?.length && (
 								<details className="mb-2 text-xs text-muted-foreground">
+									<summary className="cursor-pointer">
+										Used {message.toolData.memories.length} memories
+									</summary>
+									{message.toolData.memories.map((memory) => (
+										<p key={memory.id} className="mt-1">
+											<Link
+												to="/thread/$threadId"
+												params={{ threadId: memory.threadId }}
+												className="underline"
+											>
+												{new Date(
+													Number(memory.questionAt),
+												).toLocaleDateString()}
+												: {memory.question}
+											</Link>
+										</p>
+									))}
+								</details>
+							)}
+							{isAssistant && message.toolData?.validation ? (
+								<details
+									className={
+										message.toolData.validation.status === "qualified"
+											? "mb-2 rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text"
+											: "mb-2 text-xs text-muted-foreground"
+									}
+								>
 									<summary className="cursor-pointer">
 										{message.toolData.validation.status === "qualified"
 											? "Reviewed · evidence limitations"

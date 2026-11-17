@@ -8,7 +8,7 @@ export type ErrorType =
 	| "offline"
 	| "internal";
 
-export type Surface = "chat" | "auth" | "api" | "stream" | "database";
+export type Surface = "chat" | "api" | "stream" | "database";
 export type ErrorCode = `${ErrorType}:${Surface}`;
 
 export type ErrorVisibility = "response" | "log" | "none";
@@ -16,7 +16,6 @@ export type ErrorVisibility = "response" | "log" | "none";
 export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
 	database: "log",
 	chat: "response",
-	auth: "response",
 	stream: "response",
 	api: "response",
 };
@@ -135,14 +134,6 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
 			return "The chat request was invalid. Please try again.";
 		case "bad_request:stream":
 			return "The stream request was invalid or could not be processed.";
-		case "unauthorized:auth":
-			return "You need to sign in before continuing.";
-		case "unauthorized:chat":
-			return "You need to sign in to view or send messages in this chat.";
-		case "unauthorized:api":
-			return "You need to sign in to continue.";
-		case "forbidden:auth":
-			return "Your account does not have access to this feature.";
 		case "forbidden:chat":
 			return "This chat is private or belongs to another user.";
 		case "forbidden:api":

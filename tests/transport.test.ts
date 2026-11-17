@@ -72,14 +72,14 @@ test("unexpected server errors never expose internal details", async () => {
 			/Unable to complete/.test(error.message),
 	);
 	const publicResponse = createChatResponseStream(async () => {
-		throw new ChatTransportError("Please sign in again.");
+		throw new ChatTransportError("Please configure your provider key.");
 	});
 	await assert.rejects(
 		consumeChatStream(publicResponse, {
 			onText: () => {},
 			onReasoning: () => {},
 		}),
-		/Please sign in/,
+		/Please configure your provider key/,
 	);
 });
 

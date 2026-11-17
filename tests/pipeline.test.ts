@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { signEnvelope, verifyEnvelope } from "../src/lib/agent/bridge";
 import { checkCitations } from "../src/lib/agent/validation";
 import { consumeChatStream } from "../src/lib/stream-reader";
 
@@ -43,20 +42,6 @@ test("errors and premature EOF cannot be silently saved as success", async () =>
 		consumeChatStream(stream([{ t: "status", d: "validating" }]), callbacks),
 		/interrupted/,
 	);
-});
-test("server envelope rejects tampered owner and wrong secret", async () => {
-	const body = JSON.stringify({ userId: "alice" });
-	const signature = await signEnvelope(body, "test-secret");
-	assert.equal(await verifyEnvelope(body, signature, "test-secret"), true);
-	assert.equal(
-		await verifyEnvelope(
-			body.replace("alice", "bob"),
-			signature,
-			"test-secret",
-		),
-		false,
-	);
-	assert.equal(await verifyEnvelope(body, signature, "other"), false);
 });
 test("fabricated citations are rejected", () => {
 	const urls = new Set(["https://example.com/pricing"]);

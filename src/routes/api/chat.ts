@@ -27,6 +27,7 @@ export const Route = createFileRoute("/api/chat")({
 							? context.createNewResumableStream(streamId, () => client)
 							: null;
 					},
+					streamId,
 				);
 				return new Response(stream, {
 					headers: {

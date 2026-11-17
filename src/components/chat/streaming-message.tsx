@@ -24,12 +24,13 @@ export function StreamingMessage({
 	streamingReasoning,
 	streamingToolCalls,
 }: StreamingMessageProps) {
-	const [thinkingOpen, setThinkingOpen] = React.useState(false);
+	const [thinkingOpen, setThinkingOpen] = React.useState(true);
 
 	return (
 		<MessageScrollerItem
 			messageId="__streaming__"
 			className="flex w-full justify-start"
+			style={{ contentVisibility: "visible", containIntrinsicSize: "none" }}
 		>
 			<Message
 				align="start"
@@ -66,8 +67,12 @@ export function StreamingMessage({
 								) : null}
 							</button>
 							{thinkingOpen ? (
-								<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-									{streamingReasoning}
+								<div className="max-h-48 overflow-y-auto border-t border-border/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+									<MemoizedMarkdown
+										content={streamingReasoning}
+										id="__streaming_reasoning__"
+										isStreaming={!streamingText}
+									/>
 								</div>
 							) : null}
 						</div>

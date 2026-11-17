@@ -1,3 +1,5 @@
+import { createAgentLogger } from "./logging";
+
 /** Only explicitly public errors are sent to the browser. */
 export class ChatTransportError extends Error {}
 
@@ -11,7 +13,9 @@ const preparingEvent = `${JSON.stringify({ t: "status", d: "preparing" })}\n`;
 export function createChatResponseStream(
 	openUpstream: () => Promise<ReadableStream<Uint8Array>>,
 	resume?: ResumeStream,
+	requestId = "unknown",
 ): ReadableStream<Uint8Array> {
+	const log = createAgentLogger(requestId, "web");
 	const producer = new ReadableStream<string>({
 		async start(controller) {
 			controller.enqueue(preparingEvent);
@@ -29,6 +33,7 @@ export function createChatResponseStream(
 					reader.releaseLock();
 				}
 			} catch (error) {
+				log.error("stream.failed", error);
 				const message =
 					error instanceof ChatTransportError
 						? error.message
@@ -46,9 +51,14 @@ export function createChatResponseStream(
 	let cancelled = false;
 	const output = new ReadableStream<string>({
 		async start(controller) {
-			// Flush before waiting for Redis registration, authentication or model work.
+			// Flush before waiting for Redis registration or model work.
 			controller.enqueue(preparingEvent);
-			const registered = resume ? await resume(client).catch(() => null) : null;
+			const registered = resume
+				? await resume(client).catch((error) => {
+						log.error("resume.failed", error);
+						return null;
+					})
+				: null;
 			reader = (registered ?? client).getReader();
 			try {
 				if (cancelled) {

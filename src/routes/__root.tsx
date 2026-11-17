@@ -1,4 +1,3 @@
-import { PostHogProvider } from "@posthog/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -7,15 +6,16 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { ConvexProvider } from "convex/react";
+// convex removed
 import { ThemeProvider } from "next-themes";
+import * as React from "react";
 import { RouteErrorComponent } from "#/components/route-error";
 import { env } from "#/env";
-import { OnboardingGate } from "../components/onboarding/onboarding-gate";
+import { useUserSettingsStore } from "#/store/user-settings-store";
 import { Toaster } from "../components/ui/sonner";
 import { TooltipProvider } from "../components/ui/tooltip";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
-import { convexClient } from "../lib/convex";
+// convex removed
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
@@ -23,7 +23,8 @@ interface MyRouterContext {
 }
 
 const APP_TITLE = env.VITE_APP_TITLE ?? ".Chat";
-const APP_DESCRIPTION = "Chat application which believes on BYOK";
+const APP_DESCRIPTION =
+	"An AI chat assistant for answers, ideas, and research.";
 /** Absolute origin so crawlers get fully-qualified og:url / og:image values. */
 const APP_URL = (env.VITE_APP_URL ?? "https://chat.abhinab.tech").replace(
 	/\/$/,
@@ -99,8 +100,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-	const posthogKey = env.VITE_POSTHOG_KEY;
-	const posthogHost = env.VITE_POSTHOG_HOST ?? "https://us.i.posthog.com";
+	const refreshSettings = useUserSettingsStore((state) => state.refresh);
+	React.useEffect(() => {
+		void refreshSettings();
+	}, [refreshSettings]);
 
 	const inner = (
 		<ThemeProvider
@@ -110,48 +113,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			disableTransitionOnChange
 		>
 			<TooltipProvider>
-				{convexClient ? (
-					<ConvexProvider client={convexClient}>
-						{children}
-						<OnboardingGate />
-						<Toaster />
-					</ConvexProvider>
-				) : (
-					<>
-						{children}
-						<OnboardingGate />
-						<Toaster />
-					</>
-				)}
+				{children}
+				<Toaster />
 			</TooltipProvider>
 		</ThemeProvider>
 	);
 
-	const content = posthogKey ? (
-		<PostHogProvider
-			apiKey={posthogKey}
-			options={{
-				api_host: posthogHost,
-				defaults: "2026-08-30",
-				capture_exceptions: true,
-			}}
-		>
-			{inner}
-			<TanStackDevtools
-				config={{
-					position: "bottom-right",
-				}}
-				plugins={[
-					{
-						name: "Tanstack Router",
-						render: <TanStackRouterDevtoolsPanel />,
-					},
-					TanStackQueryDevtools,
-				]}
-			/>
-			<Scripts />
-		</PostHogProvider>
-	) : (
+	const content = (
 		<>
 			{inner}
 			<TanStackDevtools

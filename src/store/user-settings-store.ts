@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import type { SearchProviderType } from "#/lib/search/types";
 import { getUserSettings } from "#/lib/user-settings.functions";
 import type { PublicUserSettings } from "#/lib/user-settings-types";
 
@@ -9,11 +8,8 @@ interface UserSettingsState {
 	status: SettingsStatus;
 	settings: PublicUserSettings | null;
 	error: string | null;
-	/** Loads (or reloads) the current user's BYOK configuration. */
+	/** Loads server provider availability without exposing credentials. */
 	refresh: () => Promise<PublicUserSettings | null>;
-	/** Applies a settings payload returned by a save mutation. */
-	apply: (settings: PublicUserSettings) => void;
-	clear: () => void;
 }
 
 export const useUserSettingsStore = create<UserSettingsState>((set, get) => ({
@@ -36,8 +32,6 @@ export const useUserSettingsStore = create<UserSettingsState>((set, get) => ({
 			return null;
 		}
 	},
-	apply: (settings) => set({ status: "ready", settings, error: null }),
-	clear: () => set({ status: "idle", settings: null, error: null }),
 }));
 
 export function useHasSearchProvider(): boolean {
@@ -51,15 +45,4 @@ export function useHasSearchProvider(): boolean {
 				),
 		),
 	);
-}
-
-export function useHasGeminiKey(): boolean {
-	return useUserSettingsStore((state) => Boolean(state.settings?.hasGeminiKey));
-}
-
-export function getSearchProviderStatus(
-	settings: PublicUserSettings | null,
-	provider: SearchProviderType,
-) {
-	return settings?.searchProviders.find((item) => item.id === provider);
 }

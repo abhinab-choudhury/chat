@@ -1,56 +1,25 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
+	type ChatModel,
+	DEFAULT_MODELS,
+	DEFAULT_SELECTED_MODEL,
+} from "#/lib/models";
+import {
 	DEFAULT_SHORTCUTS,
 	type ShortcutAction,
 	type ShortcutBindings,
 } from "#/lib/shortcuts";
 
-export interface ChatModel {
-	id: string;
-	label: string;
-	abilities?: string[];
-	supportsDisablingReasoning?: boolean;
-}
-
-export const DEFAULT_MODELS: ChatModel[] = [
-	{
-		id: "gemini-4-hydrogen",
-		label: "Gemini 4 Hydrogen",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.8-flash",
-		label: "Gemini 3.8 Flash",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.6-flash",
-		label: "Gemini 3.6 Flash",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.5-flash-lite",
-		label: "Gemini 3.5 Flash-Lite",
-		abilities: ["function_calling"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.1-flash-lite",
-		label: "Gemini 3.1 Flash-Lite",
-		abilities: ["function_calling"],
-		supportsDisablingReasoning: true,
-	},
-];
-
-export const DEFAULT_SELECTED_MODEL = "gemini-3.5-flash-lite";
+export {
+	type ChatModel,
+	DEFAULT_MODELS,
+	DEFAULT_SELECTED_MODEL,
+} from "#/lib/models";
 
 export type ReasoningEffort = "off" | "low" | "medium" | "high";
 
-export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "low";
 
 type McpOverrides = Record<string, Record<string, boolean>>;
 
@@ -189,9 +158,9 @@ export const useModelStore = create<ModelStore>()(
 		{
 			name: "model-storage",
 			storage: createJSONStorage(() => localStorage),
-			version: 3,
+			version: 4,
 			migrate: (persisted: unknown) => {
-				// BYOK secrets moved to encrypted server-side storage; drop any
+				// Provider secrets moved to encrypted server-side storage; drop any
 				// plaintext keys left behind by older browser builds.
 				const p = { ...((persisted ?? {}) as Record<string, unknown>) };
 				delete p.geminiApiKey;
@@ -199,6 +168,9 @@ export const useModelStore = create<ModelStore>()(
 				delete p.webSearchApiKey;
 				delete p.supermemoryApiKey;
 				delete p.onboardingCompleted;
+				// Switch existing installations to the requested inexpensive testing default once.
+				p.selectedModel = DEFAULT_SELECTED_MODEL;
+				p.reasoningEffort = DEFAULT_REASONING_EFFORT;
 				return p;
 			},
 			partialize: (state) => ({

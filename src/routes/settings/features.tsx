@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { RotateCcwIcon } from "lucide-react";
 import * as React from "react";
 import { SettingsLayout } from "#/components/settings/settings-layout";
@@ -79,14 +79,7 @@ function FeaturesSettings() {
 							</Badge>
 						) : (
 							<span className="mt-2 block">
-								No provider configured.{" "}
-								<Link
-									to="/settings/web-search"
-									className="text-primary hover:underline"
-								>
-									Add one in Web Search settings
-								</Link>
-								.
+								Web search is not configured on this server.
 							</span>
 						)}
 					</CardDescription>

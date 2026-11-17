@@ -229,7 +229,7 @@ Files changed:
 - `src/components/chat/chat-home.tsx` — creates a thread on first submit and
   navigates to it.
 - `src/lib/ai.functions.ts` — server function calling Gemini with the
-  signed-in user's encrypted BYOK key.
+  signed-in user's encrypted provider key.
 
 Data flow (the sync engine in action):
 ```
@@ -254,7 +254,7 @@ Every step after the mutation is automatic. That is the sync engine.
 
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are not required. The codebase already
   conditionally registers social/OAuth providers and treats AI keys as optional.
-- Gemini is bring-your-own-key: users paste their key during onboarding or in
+- Gemini configuration: enter a provider key during onboarding or in
   Settings → AI Provider. It is encrypted server-side and never sent back to the
   browser, so no `GEMINI_API_KEY` environment variable is needed.
 - Pick a free-tier model: `gemini-3.5-flash-lite` is the cheapest/fastest and

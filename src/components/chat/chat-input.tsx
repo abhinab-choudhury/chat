@@ -10,16 +10,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "#/components/ui/select";
+import { type ChatModel, DEFAULT_MODELS } from "#/lib/models";
 import { cn } from "#/lib/utils";
 import { useModelStore } from "#/store/model-store";
 import { useHasSearchProvider } from "#/store/user-settings-store";
-
-interface ChatModel {
-	id: string;
-	label: string;
-	abilities?: string[];
-	supportsDisablingReasoning?: boolean;
-}
 
 interface ChatInputProps {
 	value: string;
@@ -31,39 +25,6 @@ interface ChatInputProps {
 	model?: string;
 	onModelChange?: (model: string) => void;
 }
-
-const DEFAULT_MODELS: ChatModel[] = [
-	{
-		id: "gemini-4-hydrogen",
-		label: "Gemini 4 Hydrogen",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.8-flash",
-		label: "Gemini 3.8 Flash",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.6-flash",
-		label: "Gemini 3.6 Flash",
-		abilities: ["reasoning", "function_calling", "effort_control"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.5-flash-lite",
-		label: "Gemini 3.5 Flash-Lite",
-		abilities: ["function_calling"],
-		supportsDisablingReasoning: true,
-	},
-	{
-		id: "gemini-3.1-flash-lite",
-		label: "Gemini 3.1 Flash-Lite",
-		abilities: ["function_calling"],
-		supportsDisablingReasoning: true,
-	},
-];
 
 function modelSupportsReasoning(modelId: string, models: ChatModel[]): boolean {
 	const m = models.find((x) => x.id === modelId);
@@ -136,6 +97,7 @@ export function ChatInput({
 	return (
 		<div className="w-full rounded-b-none rounded-2xl border border-border/50 bg-card/60 p-2 shadow-sm backdrop-blur-md">
 			<textarea
+				autoFocus
 				ref={textareaRef}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -156,7 +118,7 @@ export function ChatInput({
 						}
 						title={
 							!hasSearchProvider
-								? "Add a web search provider in Settings → Web Search"
+								? "Web search is not configured on this server"
 								: !toolsEnabled
 									? "Enable tools in Settings → AI Options first"
 									: webSearchEnabled

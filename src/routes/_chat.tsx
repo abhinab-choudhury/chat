@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
 import { AppSidebar } from "#/components/app-sidebar";
 import { ThemeToggle } from "#/components/theme-toggle";
@@ -10,16 +10,9 @@ import {
 	SidebarTrigger,
 } from "#/components/ui/sidebar";
 import { useKeyboardShortcuts } from "#/hooks/use-keyboard-shortcuts";
-import { getSession } from "#/lib/auth.functions";
 import { useSearchStore } from "#/store/search-store";
 
 export const Route = createFileRoute("/_chat")({
-	beforeLoad: async () => {
-		const session = await getSession();
-		if (!session) {
-			throw redirect({ to: "/login" });
-		}
-	},
 	component: RouteComponent,
 });
 

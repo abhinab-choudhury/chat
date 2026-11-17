@@ -1,6 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
+import * as React from "react";
 
-import { useQuery } from "convex/react";
+// convex removed
 import {
 	Bar,
 	BarChart,
@@ -18,32 +19,16 @@ import {
 	CardHeader,
 	CardTitle,
 } from "#/components/ui/card";
-import { useSession } from "#/hooks/auth-hooks";
-import { api } from "../../../convex/_generated/api";
+import { chatData } from "#/lib/chat-data";
+import { getCurrentUserId } from "#/lib/user-id";
 
 export const Route = createLazyFileRoute("/settings/usage")({
 	component: UsageSettings,
 });
 
 function UsageSettings() {
-	const { user, isPending } = useSession();
-	const usage = useQuery(
-		api.messages.getUserUsage,
-		user?.id ? { userId: user.id } : "skip",
-	);
-
-	if (!isPending && !user) {
-		return (
-			<SettingsLayout
-				title="Usage"
-				description="Track your conversations and message activity."
-			>
-				<p className="text-sm text-muted-foreground">
-					Sign in to view your usage.
-				</p>
-			</SettingsLayout>
-		);
-	}
+	const userId = getCurrentUserId();
+	const usage = React.useMemo(() => chatData.getUserUsage(userId), [userId]);
 
 	const daily = usage?.daily ?? [];
 	const totalMessages = usage?.totalMessages ?? 0;
@@ -91,7 +76,7 @@ function UsageSettings() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="h-72">
-					{isPending || (user && usage === undefined) ? (
+					{usage === undefined ? (
 						<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
 							Loading usage…
 						</div>

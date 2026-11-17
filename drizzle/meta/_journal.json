@@ -13,7 +13,7 @@
       "idx": 1,
       "version": "7",
       "when": 1794725963913,
-      "tag": "0001_user_byok_settings",
+      "tag": "0001_user_provider_settings",
       "breakpoints": true
     },
     {
@@ -21,6 +21,20 @@
       "version": "7",
       "when": 1794727485794,
       "tag": "0002_remove_memory_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794919688649,
+      "tag": "0003_chat_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794929732836,
+      "tag": "0004_agent_memory",
       "breakpoints": true
     }
   ]

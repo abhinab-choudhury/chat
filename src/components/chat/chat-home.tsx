@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+// convex removed
 import * as React from "react";
 import { LogoSymbol } from "#/components/logo";
 import { Message, MessageContent } from "#/components/ui/message";
@@ -10,8 +10,8 @@ import {
 	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "#/components/ui/message-scroller";
-import { useSession } from "#/hooks/auth-hooks";
 import { generateTitle } from "#/lib/ai.functions";
+import { chatData } from "#/lib/chat-data";
 import {
 	appendCachedMessage,
 	upsertCachedThread,
@@ -19,14 +19,13 @@ import {
 import { getCurrentUserId } from "#/lib/user-id";
 import { useChatStore } from "#/store/chat-store";
 import { useModelStore } from "#/store/model-store";
-import { api } from "../../../convex/_generated/api";
 import { ChatInput } from "./chat-input";
 import {
 	DEFAULT_QUESTION_CATEGORIES,
 	SuggestedQuestions,
 } from "./suggested-questions";
 
-const AUTH_QUESTIONS = [
+const CREATE_QUESTIONS = [
 	{ id: "a1", label: "Create a 7-day launch email sequence for a SaaS app" },
 	{ id: "a2", label: "Create a SQL schema for a multi-vendor marketplace" },
 	{ id: "a3", label: "Create a 4-week beginner half-marathon training plan" },
@@ -37,11 +36,8 @@ const AUTH_QUESTIONS = [
 ];
 
 export function ChatHome() {
-	const { user, isPending } = useSession();
 	const navigate = useNavigate();
-	const createThread = useMutation(api.threads.createThread);
-	const sendMessage = useMutation(api.messages.sendMessage);
-	const renameThread = useMutation(api.threads.renameThread);
+	// mutations via chatData
 	const message = useChatStore((s) => s.input);
 	const setMessage = useChatStore((s) => s.setInput);
 	const busy = useChatStore((s) => s.busy);
@@ -55,16 +51,13 @@ export function ChatHome() {
 	const setModel = useModelStore((s) => s.setSelectedModel);
 	const submittingRef = React.useRef(false);
 
-	const isAuthenticated = Boolean(user);
-	const userId = isPending ? null : (user?.id ?? getCurrentUserId(null));
+	const userId = getCurrentUserId();
 
-	const categories = isAuthenticated
-		? DEFAULT_QUESTION_CATEGORIES.map((category) =>
-				category.id === "create"
-					? { ...category, questions: AUTH_QUESTIONS }
-					: category,
-			)
-		: DEFAULT_QUESTION_CATEGORIES;
+	const categories = DEFAULT_QUESTION_CATEGORIES.map((category) =>
+		category.id === "create"
+			? { ...category, questions: CREATE_QUESTIONS }
+			: category,
+	);
 
 	const [optimisticMessage, setOptimisticMessage] = React.useState<
 		string | null
@@ -87,7 +80,7 @@ export function ChatHome() {
 		const clientUuid = crypto.randomUUID();
 
 		try {
-			const threadId = await createThread({
+			const threadId = await chatData.createThread({
 				userId,
 				title: fallbackTitle,
 				clientUuid,
@@ -113,7 +106,7 @@ export function ChatHome() {
 				.then((generated) => generated?.title || fallbackTitle)
 				.then((title) => {
 					if (title && title !== fallbackTitle) {
-						void renameThread({ threadId, title });
+						void chatData.renameThread({ threadId, title });
 						upsertCachedThread(userId, {
 							_id: String(threadId),
 							title,
@@ -127,15 +120,17 @@ export function ChatHome() {
 					setGeneratingTitle(threadId, false);
 				});
 
-			const sendPromise = sendMessage({
-				clientUuid: crypto.randomUUID(),
-				threadId,
-				role: "user",
-				content: trimmed,
-				userId,
-			}).catch((err) => {
-				console.error("Failed to persist initial message", err);
-			});
+			const sendPromise = chatData
+				.sendMessage({
+					clientUuid: crypto.randomUUID(),
+					threadId,
+					role: "user",
+					content: trimmed,
+					userId,
+				})
+				.catch((err) => {
+					console.error("Failed to persist initial message", err);
+				});
 
 			setPendingInitialMessage(trimmed);
 			setPendingAutoSend(true);
@@ -151,9 +146,6 @@ export function ChatHome() {
 		}
 	}, [
 		message,
-		createThread,
-		sendMessage,
-		renameThread,
 		navigate,
 		userId,
 		setMessage,
@@ -228,14 +220,10 @@ export function ChatHome() {
 								<LogoSymbol className="size-9" />
 								<div>
 									<h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-										{isAuthenticated
-											? `How can I help, ${user?.name}?`
-											: "Welcome to Chat"}
+										Welcome to Chat
 									</h1>
 									<p className="mt-0.5 text-sm text-muted-foreground">
-										{isAuthenticated
-											? "Ask anything or pick a suggestion to get started."
-											: "Sign in to save conversations, or try a question below."}
+										Ask anything or pick a suggestion to get started.
 									</p>
 								</div>
 							</div>
@@ -264,9 +252,7 @@ export function ChatHome() {
 						disabled={!userId || busy}
 						model={model}
 						onModelChange={setModel}
-						placeholder={
-							isAuthenticated ? "Type your message..." : "Ask a question..."
-						}
+						placeholder="Type your message..."
 					/>
 				</div>
 			</div>

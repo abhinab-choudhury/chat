@@ -7,7 +7,6 @@ export default defineConfig({
   out: './drizzle',
   schema: [
     './src/database/schema.ts',
-    './src/database/auth-schema.ts',
     './src/database/chat-settings.ts',
   ],
   dialect: 'postgresql',

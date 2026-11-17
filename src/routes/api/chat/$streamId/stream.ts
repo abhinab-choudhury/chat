@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "#/lib/auth";
-import { convexApi, getConvexServerClient } from "#/lib/convex-server";
+import {
+	ownedThread,
+	recoverAbandonedStream,
+	requestUserId,
+} from "#/lib/chat-persistence.server";
 import { ChatError, toChatError } from "#/lib/errors";
 import { getResumableStreamContext } from "#/lib/resumable-stream";
-import type { Id } from "../../../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/api/chat/$streamId/stream")({
 	server: {
@@ -24,40 +26,12 @@ export const Route = createFileRoute("/api/chat/$streamId/stream")({
 							message: "threadId is required",
 						});
 
-					const session = await auth.api
-						.getSession({ headers: request.headers })
-						.catch(() => null);
-					const sessionUserId = session?.user?.id as string | undefined;
-					if (!sessionUserId) {
-						return new Response(JSON.stringify({ message: "Unauthorized" }), {
-							status: 401,
-							headers: { "Content-Type": "application/json" },
-						});
-					}
-
-					// If thread context is provided, enforce owner-only access.
-					if (threadId) {
-						const convex = getConvexServerClient();
-						if (!convex) {
-							throw new ChatError("internal:stream", {
-								cause: "Convex server client is not configured.",
-							});
-						}
-						const ownerHint = sessionUserId;
-						const thread = await convex.query(convexApi.threads.getThread, {
-							threadId: threadId as Id<"threads">,
-							userId: ownerHint,
-						});
-						const ownerId = (thread as { userId?: string } | null)?.userId;
-						if (!thread || !ownerId || ownerId !== ownerHint) {
-							throw new ChatError("forbidden:stream");
-						}
-						const currentStreamId = (thread as { currentStreamId?: string })
-							.currentStreamId;
-						if (currentStreamId !== params.streamId) {
-							return new Response(null, { status: 204 });
-						}
-					}
+					const owned = await ownedThread(threadId, requestUserId(request));
+					const thread = owned
+						? await recoverAbandonedStream(owned)
+						: undefined;
+					if (!thread || thread.currentStreamId !== params.streamId)
+						return new Response(null, { status: 204 });
 
 					const ctx = getResumableStreamContext();
 					if (!ctx) {

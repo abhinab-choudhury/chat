@@ -12,20 +12,15 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChatRouteImport } from './routes/_chat'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat.library'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiChatsRouteImport } from './routes/api/chats'
 import { Route as SettingsAiOptionsRouteImport } from './routes/settings/ai-options'
-import { Route as SettingsApiKeysRouteImport } from './routes/settings/api-keys'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings/appearance'
 import { Route as SettingsFeaturesRouteImport } from './routes/settings/features'
 import { Route as SettingsModelsRouteImport } from './routes/settings/models'
-import { Route as SettingsProfileRouteImport } from './routes/settings/profile'
-import { Route as SettingsWebSearchRouteImport } from './routes/settings/web-search'
 import { Route as ChatThreadThreadIdRouteImport } from './routes/_chat.thread.$threadId'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as ApiPhrSplatRouteImport } from './routes/api/phr/$'
 import { Route as ApiChatStreamIdStreamRouteImport } from './routes/api/chat/$streamId/stream'
 
 const SettingsRouteLazyRouteImport = createFileRoute('/settings')()
@@ -33,11 +28,6 @@ const SettingsUsageLazyRouteImport = createFileRoute('/settings/usage')()
 
 const ChatRoute = ChatRouteImport.update({
   id: '/_chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRouteLazyRoute = SettingsRouteLazyRouteImport.update({
@@ -62,14 +52,14 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatsRoute = ApiChatsRouteImport.update({
+  id: '/api/chats',
+  path: '/api/chats',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsAiOptionsRoute = SettingsAiOptionsRouteImport.update({
   id: '/ai-options',
   path: '/ai-options',
-  getParentRoute: () => SettingsRouteLazyRoute,
-} as any)
-const SettingsApiKeysRoute = SettingsApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
   getParentRoute: () => SettingsRouteLazyRoute,
 } as any)
 const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
@@ -87,11 +77,6 @@ const SettingsModelsRoute = SettingsModelsRouteImport.update({
   path: '/models',
   getParentRoute: () => SettingsRouteLazyRoute,
 } as any)
-const SettingsProfileRoute = SettingsProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => SettingsRouteLazyRoute,
-} as any)
 const SettingsUsageLazyRoute = SettingsUsageLazyRouteImport.update({
   id: '/usage',
   path: '/usage',
@@ -99,25 +84,10 @@ const SettingsUsageLazyRoute = SettingsUsageLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/settings/usage.lazy').then((d) => d.Route),
 )
-const SettingsWebSearchRoute = SettingsWebSearchRouteImport.update({
-  id: '/web-search',
-  path: '/web-search',
-  getParentRoute: () => SettingsRouteLazyRoute,
-} as any)
 const ChatThreadThreadIdRoute = ChatThreadThreadIdRouteImport.update({
   id: '/thread/$threadId',
   path: '/thread/$threadId',
   getParentRoute: () => ChatRoute,
-} as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPhrSplatRoute = ApiPhrSplatRouteImport.update({
-  id: '/api/phr/$',
-  path: '/api/phr/$',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatStreamIdStreamRoute = ApiChatStreamIdStreamRouteImport.update({
   id: '/$streamId/stream',
@@ -127,131 +97,99 @@ const ApiChatStreamIdStreamRoute = ApiChatStreamIdStreamRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
+  '/api/chats': typeof ApiChatsRoute
   '/settings/ai-options': typeof SettingsAiOptionsRoute
-  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
-  '/settings/profile': typeof SettingsProfileRoute
-  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phr/$': typeof ApiPhrSplatRoute
   '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
+  '/api/chats': typeof ApiChatsRoute
   '/settings/ai-options': typeof SettingsAiOptionsRoute
-  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
-  '/settings/profile': typeof SettingsProfileRoute
-  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/': typeof ChatIndexRoute
   '/thread/$threadId': typeof ChatThreadThreadIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phr/$': typeof ApiPhrSplatRoute
   '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteLazyRouteWithChildren
   '/_chat/library': typeof ChatLibraryRoute
   '/api/chat': typeof ApiChatRouteWithChildren
+  '/api/chats': typeof ApiChatsRoute
   '/settings/ai-options': typeof SettingsAiOptionsRoute
-  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/features': typeof SettingsFeaturesRoute
   '/settings/models': typeof SettingsModelsRoute
-  '/settings/profile': typeof SettingsProfileRoute
-  '/settings/web-search': typeof SettingsWebSearchRoute
   '/settings/usage': typeof SettingsUsageLazyRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/thread/$threadId': typeof ChatThreadThreadIdRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phr/$': typeof ApiPhrSplatRoute
   '/api/chat/$streamId/stream': typeof ApiChatStreamIdStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
     | '/settings'
     | '/library'
     | '/api/chat'
+    | '/api/chats'
     | '/settings/ai-options'
-    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
-    | '/settings/profile'
-    | '/settings/web-search'
     | '/settings/usage'
     | '/thread/$threadId'
-    | '/api/auth/$'
-    | '/api/phr/$'
     | '/api/chat/$streamId/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
     | '/settings'
     | '/library'
     | '/api/chat'
+    | '/api/chats'
     | '/settings/ai-options'
-    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
-    | '/settings/profile'
-    | '/settings/web-search'
     | '/settings/usage'
     | '/'
     | '/thread/$threadId'
-    | '/api/auth/$'
-    | '/api/phr/$'
     | '/api/chat/$streamId/stream'
   id:
     | '__root__'
     | '/_chat'
-    | '/login'
     | '/settings'
     | '/_chat/library'
     | '/api/chat'
+    | '/api/chats'
     | '/settings/ai-options'
-    | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/features'
     | '/settings/models'
-    | '/settings/profile'
-    | '/settings/web-search'
     | '/settings/usage'
     | '/_chat/'
     | '/_chat/thread/$threadId'
-    | '/api/auth/$'
-    | '/api/phr/$'
     | '/api/chat/$streamId/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
-  LoginRoute: typeof LoginRoute
   SettingsRouteLazyRoute: typeof SettingsRouteLazyRouteWithChildren
   ApiChatRoute: typeof ApiChatRouteWithChildren
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiPhrSplatRoute: typeof ApiPhrSplatRoute
+  ApiChatsRoute: typeof ApiChatsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -261,13 +199,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -298,18 +229,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chats': {
+      id: '/api/chats'
+      path: '/api/chats'
+      fullPath: '/api/chats'
+      preLoaderRoute: typeof ApiChatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/ai-options': {
       id: '/settings/ai-options'
       path: '/ai-options'
       fullPath: '/settings/ai-options'
       preLoaderRoute: typeof SettingsAiOptionsRouteImport
-      parentRoute: typeof SettingsRouteLazyRoute
-    }
-    '/settings/api-keys': {
-      id: '/settings/api-keys'
-      path: '/api-keys'
-      fullPath: '/settings/api-keys'
-      preLoaderRoute: typeof SettingsApiKeysRouteImport
       parentRoute: typeof SettingsRouteLazyRoute
     }
     '/settings/appearance': {
@@ -333,25 +264,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsModelsRouteImport
       parentRoute: typeof SettingsRouteLazyRoute
     }
-    '/settings/profile': {
-      id: '/settings/profile'
-      path: '/profile'
-      fullPath: '/settings/profile'
-      preLoaderRoute: typeof SettingsProfileRouteImport
-      parentRoute: typeof SettingsRouteLazyRoute
-    }
     '/settings/usage': {
       id: '/settings/usage'
       path: '/usage'
       fullPath: '/settings/usage'
       preLoaderRoute: typeof SettingsUsageLazyRouteImport
-      parentRoute: typeof SettingsRouteLazyRoute
-    }
-    '/settings/web-search': {
-      id: '/settings/web-search'
-      path: '/web-search'
-      fullPath: '/settings/web-search'
-      preLoaderRoute: typeof SettingsWebSearchRouteImport
       parentRoute: typeof SettingsRouteLazyRoute
     }
     '/_chat/thread/$threadId': {
@@ -360,20 +277,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/thread/$threadId'
       preLoaderRoute: typeof ChatThreadThreadIdRouteImport
       parentRoute: typeof ChatRoute
-    }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/phr/$': {
-      id: '/api/phr/$'
-      path: '/api/phr/$'
-      fullPath: '/api/phr/$'
-      preLoaderRoute: typeof ApiPhrSplatRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/chat/$streamId/stream': {
       id: '/api/chat/$streamId/stream'
@@ -401,23 +304,17 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface SettingsRouteLazyRouteChildren {
   SettingsAiOptionsRoute: typeof SettingsAiOptionsRoute
-  SettingsApiKeysRoute: typeof SettingsApiKeysRoute
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
   SettingsFeaturesRoute: typeof SettingsFeaturesRoute
   SettingsModelsRoute: typeof SettingsModelsRoute
-  SettingsProfileRoute: typeof SettingsProfileRoute
-  SettingsWebSearchRoute: typeof SettingsWebSearchRoute
   SettingsUsageLazyRoute: typeof SettingsUsageLazyRoute
 }
 
 const SettingsRouteLazyRouteChildren: SettingsRouteLazyRouteChildren = {
   SettingsAiOptionsRoute: SettingsAiOptionsRoute,
-  SettingsApiKeysRoute: SettingsApiKeysRoute,
   SettingsAppearanceRoute: SettingsAppearanceRoute,
   SettingsFeaturesRoute: SettingsFeaturesRoute,
   SettingsModelsRoute: SettingsModelsRoute,
-  SettingsProfileRoute: SettingsProfileRoute,
-  SettingsWebSearchRoute: SettingsWebSearchRoute,
   SettingsUsageLazyRoute: SettingsUsageLazyRoute,
 }
 
@@ -437,11 +334,9 @@ const ApiChatRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
-  LoginRoute: LoginRoute,
   SettingsRouteLazyRoute: SettingsRouteLazyRouteWithChildren,
   ApiChatRoute: ApiChatRouteWithChildren,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiPhrSplatRoute: ApiPhrSplatRoute,
+  ApiChatsRoute: ApiChatsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

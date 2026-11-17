@@ -4,23 +4,15 @@ import { z } from "zod";
 export const env = createEnv({
 	server: {
 		SERVER_URL: z.url().optional(),
-		BETTER_AUTH_URL: z.url().optional(),
-		BETTER_AUTH_SECRET: z.string().min(32).optional(),
+		OPENAI_API_KEY: z.string().min(1).optional(),
+		OPENAI_MODEL: z.string().min(1).optional(),
+		GEMINI_API_KEY: z.string().min(1).optional(),
+		GEMINI_MODEL: z.string().min(1).optional(),
+		OLLAMA_BASE_URL: z.url().optional(),
+		SERPER_API_KEY: z.string().min(1).optional(),
 		DATABASE_URL: z.string().min(1).optional(),
 		REDIS_URL: z.string().min(1).optional(),
-		GOOGLE_CLIENT_ID: z.string().min(1).optional(),
-		GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
-		GITHUB_CLIENT_ID: z.string().min(1).optional(),
-		GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
 		VERCEL_URL: z.string().min(1).optional(),
-		SMTP_HOST: z.string().min(1).optional(),
-		SMTP_PORT: z.string().min(1).optional(),
-		SMTP_SECURE: z.string().optional(),
-		SMTP_USER: z.string().min(1).optional(),
-		SMTP_PASS: z.string().min(1).optional(),
-		EMAIL_FROM: z.string().min(1).optional(),
-		ENCRYPTION_KEY: z.string().min(1).optional(),
-		AGENT_BRIDGE_SECRET: z.string().min(32).optional(),
 	},
 
 	/**
@@ -33,8 +25,6 @@ export const env = createEnv({
 		VITE_APP_TITLE: z.string().min(1).optional(),
 		/** Public origin used for absolute Open Graph/Twitter URLs. */
 		VITE_APP_URL: z.url().optional(),
-		VITE_POSTHOG_KEY: z.string().min(1).optional(),
-		VITE_POSTHOG_HOST: z.string().min(1).optional(),
 	},
 
 	/**
