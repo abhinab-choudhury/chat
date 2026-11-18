@@ -4,6 +4,8 @@ TanStack Start chat with PostgreSQL/pgvector memory, local Ollama embeddings,
 Gemini or OpenAI answers, and optional Serper web search. No login; conversations are scoped
 to an anonymous browser cookie. Run locally; this is not an authenticated public service.
 
+<img width="1916" height="929" alt="Home Screen" src="https://github.com/user-attachments/assets/9f68d00b-c96e-47ed-8343-5a283b02172c" />
+
 ## Setup
 
 Requires Node.js 22+, Docker, and Ollama.
@@ -60,3 +62,4 @@ npm run build
 Tests use fake providers and do not spend API quota. Optional database integration:
 set `TEST_DATABASE_URL` to a disposable, migrated PostgreSQL database, then run
 `npm test`. Never point it at your application database.
+](https://share.gemini.google/Yne1tf8EwJbJ)
