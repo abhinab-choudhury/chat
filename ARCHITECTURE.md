@@ -1,6 +1,6 @@
 # .Chat architecture
 
-Implementation reference, checked against the repository on 18 November 2026.
+Technical guide to the current application, updated on 18 November 2026.
 [DESIGN.md](DESIGN.md) explains the choices and limitations; this document describes the running code.
 
 ## Runtime and dependencies
@@ -47,6 +47,7 @@ React UI / useThreadChat / Zustand cache
 | `src/lib/agent/core.ts` | Input schema, system prompt, web tool and draft configuration |
 | `src/lib/agent/comparison.ts`, `validation.ts` | Provenance checks, citation checks, review schema and instructions |
 | `src/lib/memory/` | Context, recall, atomic commit, date resolution, embedding jobs |
+| `src/lib/memory/short-term.ts` | Bounded recent-message window and term-based context selection |
 | `src/lib/chat-persistence.server.ts` | Ownership, stream cleanup and abandoned-run recovery |
 | `src/lib/resumable-stream.ts` | Redis connections, replay context and generation leases |
 | `src/lib/server-logging.ts`, `api-logging.server.ts` | Log formatting and asynchronous request correlation |
@@ -72,7 +73,7 @@ There is no account authentication. The browser creates an `anon-…` ID in loca
 2. `/api/chat` validates the body. It still accepts a bounded `messages` array for compatibility, but generation reconstructs history from PostgreSQL.
 3. Dispatch resolves the cookie owner, checks thread ownership and selected-provider credentials, and checks the requested run ID (`streamId`). Completed runs can return their saved answer; failed/cancelled run IDs are rejected. An existing active stream may be replayed.
 4. A conditional thread update claims `currentStreamId`. Competing callers do not freely start another generation in the same thread. This is a database claim, not a process-local mutex.
-5. The direct pipeline loads up to 50 recent messages with a 24,000-character context budget and requires the latest context message to be a user question. It inserts a `running` run and optionally recalls memory.
+5. The direct pipeline reads the latest 21 messages and selects the latest user question. It builds a short-term window from up to 20 other messages within a 24,000-character budget, then selects the last four window entries and older entries matching question terms. The model receives this selected context with the current question. The pipeline inserts a `running` run and optionally recalls cross-thread memory.
 6. AI SDK generates a structured draft with answer, memory IDs, quoted user facts and comparison claims. It can call `web_search`, `search_memory`, and `read_episode` when those capabilities are enabled.
 7. Deterministic checks validate memory references and comparison provenance. Comparison prompts, attempted web searches, or current-information keywords trigger a separate structured review using the same selected model. Review moves the run to `reviewing`.
 8. Review can support, qualify or block an answer. A blocked review produces an explanatory response and disables memory archival for that turn. Reviewed answers also pass URL citation checks.
@@ -116,7 +117,7 @@ The worker starts on the first chat request, drains once immediately and then ev
 | Draft loop | At most 5 AI SDK steps; tools disabled on the final step |
 | Review | One extra model call when review is required |
 | Output cap | 8,000 tokens per draft step/review request |
-| History | 50 rows, 24,000 characters; not a tokenizer-based limit |
+| Recent thread context | Read 21 rows; build a window of up to 20 prior messages and 24,000 characters; keep the last four window entries plus older term matches |
 | Memory tools | 6 combined `search_memory`/`read_episode` calls after initial recall |
 | Memory context | 24,000 characters per recall result, 48,000 cumulative |
 | Web search | 8 unique query executions, concurrency 3, 15-second tool timeout, at most 5 normalized results per query |

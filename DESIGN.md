@@ -1,118 +1,126 @@
-# .Chat design decisions
+# .Chat: product design and decisions
 
-Current design rationale, checked against the implementation on 18 November 2026.
-[ARCHITECTURE.md](ARCHITECTURE.md) is the reference for modules, endpoints, schemas and numeric limits. This document replaces the earlier theoretical proposal; unimplemented ideas are identified explicitly below.
+.Chat is a chat assistant that can use saved conversations and search the web. It helps users return to an earlier discussion and check whether the answer is still useful today.
 
-## Purpose and evaluation scenarios
+For example, a user might ask: “Last Tuesday we compared Postgres hosting services. Have any of their prices changed?” The assistant needs to find that conversation, look for current information, and explain what the evidence supports.
 
-.Chat is a memory-aware conversational research assistant. Its distinguishing task is to recover a historical exchange, find current evidence, and distinguish what it previously said from what can be established now.
+This document explains the product and the reasons behind its design. [ARCHITECTURE.md](ARCHITECTURE.md) describes the code and technical limits. [README.md](README.md) has setup instructions.
 
-Three motivating scenarios are:
+## What the product should do
 
-1. “On Monday we shortlisted five CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?”
-2. “What did I ask you on 3 November? Is your answer still correct today?”
-3. “Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?”
+The main use cases are:
 
-These scenarios guide implementation and fixtures. They are not proof of measured live answer quality, and no external hiring rubric is asserted here.
+1. Remember a previous discussion, such as a shortlist of five CRM tools for a 20-person team.
+2. Find questions from a particular day, such as “What did I ask on 3 November?”
+3. Compare an earlier answer with current information, while clearly saying when a change cannot be verified.
 
-## Decisions and consequences
+A useful answer should distinguish what the assistant said before from what the sources support now. If the earlier answer was wrong or lacked evidence, the assistant should say so. It should not describe every difference as a real-world change.
 
-| Decision | Reason | Consequence |
-| --- | --- | --- |
-| TanStack Start on Node with one server-side agent pipeline | Keep UI, HTTP boundaries and backend code in one project | Long-running producer work depends on the process staying alive |
-| PostgreSQL + Drizzle + pgvector | Keep source history, memory, transactional commits and hybrid search together | Requires a real database and extension setup; SQLite is not supported |
-| Environment-owned credentials | Prevent browser settings from receiving provider secrets | All browser scopes share the deployment's provider budget |
-| Anonymous browser scope | Avoid an account/login flow for this application | Cookie identity is not authentication; no trusted multi-tenant security guarantee |
-| Server-reconstructed conversation | Preserve canonical history independently of browser cache | Client history remains in the request contract but is not generation authority |
-| One draft/tool loop with conditional review | Permit research without a separate execution architecture for each request type | Research may require several model calls and a second review pass |
-| Commit before final answer delivery | Display the persisted answer rather than an unsaved draft | Progress streams immediately, but answer text is buffered |
-| Atomic answer and memory projection | Avoid delivering a completed memory-enabled answer before its episode exists | Memory transaction work is on the answer path; embeddings alone are deferred |
-| Local embeddings | Separate retrieval enrichment from paid generation quotas | Missing Ollama reduces recall to lexical search and delays indexing |
-| Optional Redis replay | Support reloads without making Redis the canonical history store | Replay helps reconnects, not process-crash recovery of computation |
+## How a conversation works
 
-## What memory means
+The user writes a question and chooses whether to enable Memory and Web Search. The server saves the question, loads relevant context, and asks the selected model to prepare an answer.
 
-Working context, episodic memory and user facts have separate responsibilities:
+When Memory is enabled, the assistant can look up earlier conversations. When Web Search is enabled and configured, it can search for current information. Research and comparison answers go through an additional review step before they are saved and shown.
 
-- **Working context** contains bounded recent messages from the current thread. It applies even when cross-thread memory is disabled. The budget is in characters, not measured tokens.
-- **Episodes** preserve a completed exchange with source IDs, source text snapshots, question time and evidence metadata. They represent what happened then, not verified current world knowledge.
-- **User facts** represent explicit assertions or preferences from the current user question. The draft supplies structured keys and supporting quotes. Persistence rejects quotes absent from the question and versions assertions through supersession.
+The interface shows progress while this happens. Final answer text arrives after it has been saved. It does not appear word by word while the model is drafting. This adds waiting time, but allows the application to check and save the answer before presenting it.
 
-A quoted substring is a provenance check, not a proof that the extracted meaning is correct. Scope-aware fact keys are model-produced, and substring validation does not enforce semantic equivalence. There is no separate fact-verifier model or calibrated confidence threshold.
+## Architecture choices
 
-Only eligible memory-enabled turns create episodes. Disabling memory does not delete existing records, remove current-thread context, or disable ordinary message persistence. A blocked review saves its explanatory answer without creating a memory projection for that turn.
+The application uses React and TanStack Start, with a Node.js server in the same project. Keeping the interface and backend together makes the local application easier to run and maintain.
 
-Archive excludes a projection from recall and can be reversed. Forget excludes the projection and removes its associated facts/jobs in the API while keeping source chat history. Neither operation claims to erase backups or all copies in browser storage. Editing sources makes mismatching projections ineligible for relevant reads; there is no automatic comprehensive re-extraction or historical backfill service.
+PostgreSQL stores conversations, generation status, and memory. Drizzle provides the database queries and migrations. The pgvector extension lets the same database search for memories with similar meaning, avoiding a separate vector database.
 
-## Recall policy and coverage
+Gemini or OpenAI generates answers. The user selects the provider; the application does not silently switch providers after a failure. Provider keys stay on the server.
 
-Exact historical dates take a database query path rather than a semantic top-k path. A deterministic resolver interprets the supported grammar in the browser-supplied timezone and returns a labeled date range. Calendar boundaries account for timezone transitions. Ambiguous recognized dates are clarified instead of silently broadening the query.
+Serper supplies web search results. The active chat pipeline uses search excerpts rather than reading full pages, so some answers may need more evidence than the current search can provide.
 
-Exact-date pagination is exhaustive only within the query's eligible records: unarchived/unforgotten source-valid episodes and qualifying incomplete memory-enabled runs. It cannot honestly claim to list every question ever typed. Memory-off exchanges and questions that never received a run are outside that index.
+Ollama creates local embeddings: numerical representations used to find related text. This keeps memory indexing separate from paid generation calls. If Ollama is unavailable, keyword search still works, but recall may be less effective.
 
-Topic retrieval fuses full-text and vector ranks rather than adding incomparable raw scores. It returns bounded candidates, coverage metadata and recent current facts. Initial recall is supplemented by on-demand `search_memory` and `read_episode` tools. Retrieval can still miss paraphrases, choose irrelevant facts, truncate context or lack embeddings. There is no reranker, HyDE, entity graph, multi-vector memory, hierarchical summary layer or learned retrieval weighting.
+Redis is optional. It stores output for replay after a reload. PostgreSQL remains the source of saved conversation history.
 
-## Evidence and historical comparisons
+## How memory works
 
-A defensible comparison separates four things:
+The application uses three kinds of context.
 
-1. The prior answer's actual wording.
-2. Evidence stored with that historical answer.
-3. Evidence retrieved for the current request.
-4. Whether those observations establish a change and, separately, its effective date.
+### Recent conversation
 
-The draft comparison ledger supports `still supported`, `changed`, `prior answer unsupported`, `conflicting evidence`, and `unable to verify`. Host checks reject unknown baseline IDs and current URLs absent from the request's evidence set. Supported comparison verdicts require a quote from the baseline answer and current evidence. A `changed` verdict additionally requires historical evidence to exist.
+The assistant uses a limited amount of the current thread even when Memory is off. The server reads the latest 21 messages, identifies the latest user question, and builds a window of up to 20 other messages within a 24,000-character budget. It keeps the last four entries in that window and older entries whose text matches terms in the question.
 
-These are minimum provenance constraints. They do not mechanically prove a price changed, validate every timestamp, or normalize billing terms. Currency, region, plan, seats, annual/monthly billing, tax and promotional conditions still need model review. A newly retrieved undated page is an observation now, not proof of when the vendor changed it. Lack of search results is not evidence of no change.
+This keeps the prompt smaller, but simple word matching can miss a relevant earlier message. The assistant does not receive the entire thread on every turn.
 
-Search currently uses Serper excerpts with automatic page scraping disabled in the active agent wrapper. URLs and excerpt lengths are normalized and bounded; query execution is deduplicated per request. There is no active `read_source` tool, constrained page crawler, publication-date extractor or independent source-quality scoring service.
+### Saved exchanges
 
-## Generation and review
+An eligible completed turn with Memory enabled creates an episode: a saved question-and-answer pair with its date, source message links, and evidence. Episodes record what was said at the time. They are not automatically verified facts about the present.
 
-All turns use the same structured draft pipeline. The model decides which available tools to call within host budgets. Comparison recognition uses a regex heuristic; current-information keywords and attempted searches also trigger review. This is not a general semantic intent classifier, so paraphrased requests can evade the heuristic.
+The answer and episode are saved in one database transaction. This prevents a successful memory-enabled answer from being saved without its episode. Embeddings are created later by a background worker, with a maximum of three attempts per job.
 
-Ordinary conversation can complete in one model call. Tool continuations can expand draft generation to five steps, followed by one additional review call when required. Provider-level retries can add network attempts beyond those logical calls. The review uses the same selected model, so correlated errors remain possible.
+### User facts
 
-Review assesses supplied evidence and emits supported/qualified/blocked output. Citation URL checks reject unrecognized web links for reviewed answers. Valid URLs alone do not establish claim support. A blocked result becomes an explicit inability-to-verify response instead of publishing the draft as a verified answer.
+The assistant can save explicit information from the current question, such as a preference. Each fact must include a quote found in that question. A newer assertion with the same fact key replaces the older one for current recall while preserving its history.
 
-The product streams status and search summaries while computing. Final text is emitted after the commit, not token by token as the model writes. “Streaming” therefore describes transport/progress and replay, not continuous unreviewed text generation. The client can render incremental text if supplied, but that is not the current producer's delivery strategy.
+The quote check proves where the text came from. It does not prove that the model interpreted it correctly.
 
-## Controls and visible behavior
+## Finding the right memory
 
-| Memory | Web search | Available behavior |
-| --- | --- | --- |
-| Off | Off | Current-thread conversation; no cross-thread recall or new memory projection |
-| On | Off | Current-thread context, historical recall, and eligible memory writes; no fresh web evidence |
-| Off | On | Current-thread context and configured live search; no cross-thread recall or new memory projection |
-| On | On | Historical recall, live research, comparisons and eligible memory writes |
+Questions about a specific date use a date lookup. The application interprets supported dates in the user's timezone. For example, “last Tuesday” means Tuesday in the previous calendar week. Ambiguous or invalid recognized dates require clarification.
 
-Search also requires its provider key and the UI's master tool setting. Missing search capability is disclosed in the prompt. Memory availability in public settings does not prove Ollama or vector indexing is healthy.
+Date results are paginated. They cover eligible saved episodes and certain unfinished memory-enabled runs, rather than every question ever entered. Conversations saved with Memory off are not automatically added later.
 
-The library displays the latest 100 episodes, facts, source links, archive/forget controls and indexing status. It is not a general memory correction editor, “why used” inspector, export interface or retention dashboard.
+Questions about a topic combine keyword search with similarity search. The application combines the rankings from both searches and gives the model a limited set of results. The model can request further searches or read an episode when needed.
 
-The sidebar orders history by activity, preserves unchanged snapshot references and memoizes rows. Polling reconciles authoritative changes without moving the active thread simply because it was refreshed. Renaming or new messages can legitimately change activity order. The browser cache accelerates rendering; it does not replace PostgreSQL ownership checks or persisted history.
+Historical messages carry their recording date. A phrase such as “yesterday” in an old message should refer to the day before that message, not the day of the new question. Likewise, an old statement about someone's age is not enough to calculate their exact current age without a birth date. These rules are included in model instructions; the model can still make mistakes.
 
-## Failure behavior and observability
+## Checking whether something changed
 
-A successful HTTP opening is distinct from successful generation. The API logs `response.opened` for NDJSON responses; the agent logs completion only after committing, and logs failures caught inside the stream. Request IDs connect API, generation and provider events.
+A comparison needs the earlier answer, any evidence saved with it, and fresh evidence for the new question. The answer can conclude that a claim is still supported, has changed, was previously unsupported, has conflicting evidence, or cannot be verified.
 
-A provider **429** indicates a rate-limit/quota response; a **503** indicates provider unavailability. They have distinct UI messages. The process-local provider gate serializes calls, spaces requests, bounds its queue, honors retry delays and applies cooldowns. It is not an account-wide rate limiter, and cannot by itself prevent token-budget or billing-quota failures. Changing providers or models is explicit; there is no silent fallback.
+The application checks that referenced memories and current URLs belong to the evidence available for the request. A supported comparison needs a quote from the earlier answer and current evidence. A “changed” conclusion also requires historical evidence.
 
-Shared logs show status, timings, steps, token usage, allowlisted rate-limit fields and selected provider reason codes. They omit raw provider bodies, prompts, answers and credentials. Local formatting is readable and production formatting is JSON. Legacy Redis/search console paths remain outside the unified logger. Unit tests deliberately simulate failures and may print warning/error logs even when passing.
+These checks reduce unsupported claims, but do not prove that two prices are comparable. The review still needs to consider currency, region, plan, seat count, billing period, taxes, and promotions. Finding a different price today also does not establish when it changed.
 
-A disconnected client leaves the tee's background consumer running. Redis can replay buffered output after reload while the producer is alive. A crashed process cannot resume model computation; abandoned-run cleanup is triggered by later application activity rather than a separate continuously running watchdog. The embedding queue is durable and bounded, but it is not a general workflow engine.
+The review uses the same selected model as the draft, so both steps can make similar mistakes. If the review blocks an answer, the application saves an explanation of what it could not verify and does not create a memory episode for that turn.
 
-## Verification and remaining work
+## User controls
 
-Automated coverage includes temporal/DST behavior, source-linked memory lifecycle, comparison provenance, provider routing and cooldowns, safe diagnostics, stream behavior, stable history snapshots and Strict Mode auto-send. Database suites require a migrated `TEST_DATABASE_URL`; provider/search/embedding responses in those suites are mocked. Passing fixtures do not establish live retrieval accuracy, factual correctness or latency percentiles.
+| Setting | Effect |
+| --- | --- |
+| Memory off | Use recent thread context; do not recall other threads or save new episodes. Ordinary chat messages are still saved. |
+| Memory on | Recall eligible past exchanges and save eligible new episodes. |
+| Web Search off | Answer without fresh web evidence. |
+| Web Search on | Search when the provider key and master tool setting allow it. |
 
-The current implementation does not claim:
+The memory library shows the latest 100 episodes, related facts, source links, and indexing status. Users can archive, unarchive, or forget a memory.
 
-- Authenticated accounts, PostgreSQL row-level security, column encryption or abuse quotas per account.
-- Multi-replica provider budgeting or durable restartable generation.
-- Automatic memory backfill, re-embedding migrations, compaction, TTL decay or delete-all/export workflows.
-- Guaranteed end-to-end deadlines from every constant in `limits.ts`.
-- Live quality benchmark results, calibrated extraction confidence or a measured p95 latency target.
-- A tested backup/restore procedure or disaster-recovery service.
+Archiving hides a memory from recall and can be reversed. Forgetting excludes the derived memory and removes associated facts and jobs, while keeping the original chat. Turning Memory off does not delete earlier memories.
 
-The next useful measurements are logical and physical model calls per turn, input/output tokens, provider error classifications, recall hit rate on dated/topic fixtures, comparison support accuracy, and time to progress versus time to committed answer. Those measurements should guide any additional model pass, reranker, lower token budget or distributed rate-control system. Adding more layers without evidence would increase cost and failure modes.
+Editing source messages makes outdated derived records ineligible for relevant memory reads. There is no automatic process that rebuilds all affected memories after an edit.
+
+## Reliability and privacy
+
+The server uses saved database history when generating answers. Browser storage is a cache for the interface. A database claim prevents competing requests from freely starting another generation in the same thread, and completed run IDs can return their saved answers.
+
+A disconnected browser does not by itself stop the server from finishing and saving an answer. Redis can replay output while the producer is alive. If the server process crashes, it cannot resume the model computation. Later application activity detects abandoned runs and can mark them as failed.
+
+This is a local demo without login. Conversations are grouped by an anonymous browser identifier stored in a cookie and browser storage. Because that identifier is controlled by the client, it is not suitable as account authentication for a public multi-user service.
+
+Provider calls are queued and paced within one server process. Rate-limit errors and provider outages have different messages. This reduces bursts but does not enforce a provider's account-wide spending or token quota.
+
+Shared logging records request IDs, status, timing, and token usage while omitting prompts, answers, credentials, and raw provider error bodies. Some older search and Redis paths still use separate console logging.
+
+## How to evaluate the design
+
+Automated tests cover date handling, memory lifecycle, comparison evidence checks, provider failures, streaming, and client history behavior. Database tests require a migrated disposable PostgreSQL database. Mock provider responses test application behavior; they do not measure the quality of live model answers.
+
+Three useful manual checks are:
+
+1. Save a CRM shortlist, then ask in another thread whether those vendors changed pricing. Check that the answer refers to the original shortlist and explains evidence gaps.
+2. Save several questions on the same day, then ask for that date. Check the source links and whether more results are available.
+3. Ask about a previous hosting comparison with Web Search off, then with Memory off. Check that the answer explains what information is unavailable.
+
+Live answer accuracy, retrieval quality, cost per turn, and response time still need measurement. [docs/memory-evaluation.md](docs/memory-evaluation.md) records earlier verification and its limits.
+
+## What should improve next
+
+The first priority is to measure how often the assistant finds the right conversation and supports its comparisons with evidence. Those results should guide changes to retrieval and review.
+
+Before a public release, the application needs authenticated accounts, usage controls, and a tested backup and restore process. Other useful improvements include full-page source reading, clearer memory correction and deletion tools, and generation jobs that can recover after a server restart. These are future work, not existing features.
