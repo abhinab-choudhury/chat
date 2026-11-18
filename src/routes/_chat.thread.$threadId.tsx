@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertCircle, ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 import { ChatInput } from "#/components/chat/chat-input";
 import { ChatMessageItem } from "#/components/chat/chat-message";
 import { StreamingMessage } from "#/components/chat/streaming-message";
 import { RouteErrorComponent } from "#/components/route-error";
-import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import {
 	MessageScroller,
@@ -42,7 +41,6 @@ function RouteComponent() {
 		pendingAutoSend,
 		streamingText,
 		agentPhase,
-		chatError,
 		streamingReasoning,
 		streamingToolCalls,
 		selectedModel,
@@ -122,15 +120,6 @@ function RouteComponent() {
 						className="px-4 py-6 pb-36"
 					>
 						<MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6">
-							{chatError ? (
-								<Alert variant="destructive">
-									<AlertCircle aria-hidden="true" />
-									<AlertTitle>Response could not be completed</AlertTitle>
-									<AlertDescription>
-										<p className="break-words">{chatError}</p>
-									</AlertDescription>
-								</Alert>
-							) : null}
 							{displayMessages.map((m) => (
 								<ChatMessageItem
 									key={m._id}

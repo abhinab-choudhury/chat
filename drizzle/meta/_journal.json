@@ -36,6 +36,13 @@
       "when": 1794929732836,
       "tag": "0004_agent_memory",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795022389190,
+      "tag": "0005_remove_unused_auth_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { isStepCount, tool } from "ai";
 import { z } from "zod";
+import { memoryAnswerPolicy } from "../memory/policy";
 import type { SearchAdapter, SearchResult } from "../search/types";
 import { AGENT_LIMITS } from "./limits";
 
@@ -41,6 +42,7 @@ export function systemPrompt(
 	searchAvailable = true,
 ) {
 	return `You are a thoughtful, precise conversational research assistant. Answer the actual question directly, with appropriate depth. Be warm, concise by default, and explain tradeoffs. Ask one focused clarification only when missing information materially changes the answer; otherwise state reasonable assumptions.
+${memoryAnswerPolicy}
 Current instant: ${now.toISOString()}. User's local date: ${now.toLocaleDateString("en-CA", { timeZone: timezone })}. Timezone: ${timezone}.
 You have exactly one external tool: web_search. Search is ${searchAvailable ? "available" : "UNAVAILABLE; explicitly disclose that current claims cannot be verified"}.
 Search when freshness or uncertain factual detail matters: prices, availability, releases, news, niche facts, consequential advice. Do not search for greetings, rewriting, brainstorming or stable explanations unless needed. Never claim to have checked without successful search evidence.

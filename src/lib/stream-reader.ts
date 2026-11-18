@@ -71,6 +71,9 @@ export async function consumeChatStream(
 		else if (evt.t === "r" && evt.d) {
 			reasoning += evt.d;
 			callbacks.onReasoning(reasoning);
+		} else if (evt.t === "replace") {
+			text = evt.d;
+			callbacks.onText(text);
 		} else if (evt.t === "t" && evt.d) {
 			text += evt.d;
 			callbacks.onText(text);

@@ -12,6 +12,7 @@ import {
 	recoverAbandonedStream,
 	requestUserId,
 } from "#/lib/chat-persistence.server";
+import { shortTermWindow } from "#/lib/memory/short-term";
 import { serverLog } from "#/lib/server-logging";
 
 const mutation = z.discriminatedUnion("op", [
@@ -87,7 +88,29 @@ export const Route = createFileRoute("/api/chats")({
 							.where(eq(memoryFacts.userId, userId))
 							.orderBy(desc(memoryFacts.createdAt))
 							.limit(500);
-						return Response.json({ episodes, facts });
+						const recentThreads = await db
+							.select({ id: chatThreads.id, title: chatThreads.title })
+							.from(chatThreads)
+							.where(
+								and(
+									eq(chatThreads.userId, userId),
+									eq(chatThreads.archived, false),
+								),
+							)
+							.orderBy(desc(chatThreads.updatedAt))
+							.limit(20);
+						const shortTerm = await Promise.all(
+							recentThreads.map(async (thread) => {
+								const rows = await db
+									.select()
+									.from(chatMessages)
+									.where(eq(chatMessages.threadId, thread.id))
+									.orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+									.limit(20);
+								return { ...thread, entries: shortTermWindow(rows) };
+							}),
+						);
+						return Response.json({ episodes, facts, shortTerm });
 					}
 
 					const threads = await db

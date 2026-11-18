@@ -2,7 +2,7 @@ export const agentPhases = {
 	preparing: "Preparing your response…",
 	memory: "Loading conversation context…",
 	researching: "Researching and drafting…",
-	validating: "Checking claims against sources…",
+	validating: "Checking answer…",
 	saving: "Saving your answer…",
 	complete: "Complete",
 } as const;

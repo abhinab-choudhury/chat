@@ -1,4 +1,11 @@
-import { generateText, isStepCount, Output, type ToolSet, tool } from "ai";
+import {
+	generateText,
+	isStepCount,
+	Output,
+	streamText,
+	type ToolSet,
+	tool,
+} from "ai";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/database";
@@ -23,6 +30,20 @@ import { errorMetadata } from "./logging";
 import { agentModel, modelErrorMessage } from "./provider.server";
 import { checkCitations, reviewInstructions, reviewSchema } from "./validation";
 
+const comparisonSchema = z.object({
+	claim: z.string(),
+	baselineEpisodeId: z.string().nullable(),
+	historicalClaim: z.string().nullable(),
+	currentEvidenceUrls: z.array(z.string()),
+	verdict: z.enum([
+		"still supported",
+		"changed",
+		"prior answer unsupported",
+		"conflicting evidence",
+		"unable to verify",
+	]),
+});
+
 const draftSchema = z.object({
 	answer: z.string().min(1).max(32000),
 	memoryIds: z.array(z.string()).max(30),
@@ -35,26 +56,25 @@ const draftSchema = z.object({
 			}),
 		)
 		.max(5),
-	comparisons: z
-		.array(
-			z.object({
-				claim: z.string(),
-				baselineEpisodeId: z.string().nullable(),
-				historicalClaim: z.string().nullable(),
-				currentEvidenceUrls: z.array(z.string()),
-				verdict: z.enum([
-					"still supported",
-					"changed",
-					"prior answer unsupported",
-					"conflicting evidence",
-					"unable to verify",
-				]),
-			}),
-		)
-		.max(30),
+	comparisons: z.array(comparisonSchema).max(30),
 });
 
-/** One persisted, buffered, reviewed path for every turn. */
+/**
+ * Schema sent to the model. Gemini rejects schemas with numeric bounds
+ * ("The specified schema produces a constraint that has too many states"),
+ * so the model sees no min/max constraints. `draftSchema` enforces the limits
+ * after generation instead.
+ */
+const modelDraftSchema = z.object({
+	answer: z.string(),
+	memoryIds: z.array(z.string()),
+	userFacts: z.array(
+		z.object({ key: z.string(), content: z.string(), quote: z.string() }),
+	),
+	comparisons: z.array(comparisonSchema),
+});
+
+/** One streamed draft and persisted, reviewed path for every turn. */
 export async function openDirectStream(
 	_request: Request,
 	body: ChatRequest,
@@ -70,7 +90,7 @@ export async function openDirectStream(
 		model: body.model,
 	};
 	serverLog("info", "agent", "generation.started", logFields);
-	const { messages, question } = await threadContext(threadId);
+	const { messages, question, shortTerm } = await threadContext(threadId);
 	if (!question || messages.at(-1)?.role !== "user")
 		throw new Error("Save a new question before starting a response.");
 	await db.insert(agentRuns).values({
@@ -104,7 +124,7 @@ export async function openDirectStream(
 				const rememberResult = (result: Awaited<ReturnType<typeof recall>>) => {
 					let size = 0;
 					const episodes = result.episodes
-						.map((e) => episodeExcerpt(e))
+						.map((e) => episodeExcerpt(e, body.timezone))
 						.filter((e) => {
 							const length = JSON.stringify(e).length;
 							if (size + length > 24000 || memoryChars + length > 48000)
@@ -115,7 +135,7 @@ export async function openDirectStream(
 							return true;
 						});
 					const facts = ("facts" in result ? (result.facts ?? []) : [])
-						.map((f) => ({ ...f, ...episodeExcerpt(f) }))
+						.map((f) => ({ ...f, ...episodeExcerpt(f, body.timezone) }))
 						.filter((f) => {
 							const length = JSON.stringify(f).length;
 							if (size + length > 24000 || memoryChars + length > 48000)
@@ -248,14 +268,17 @@ export async function openDirectStream(
 										)
 									)
 										return { error: "Episode sources changed" };
-									const record = episodeExcerpt({
-										id: episode.id,
-										threadId: episode.threadId,
-										question: episode.question,
-										answer: episode.answer,
-										evidence: episode.evidence,
-										questionAt: episode.questionAt,
-									});
+									const record = episodeExcerpt(
+										{
+											id: episode.id,
+											threadId: episode.threadId,
+											question: episode.question,
+											answer: episode.answer,
+											evidence: episode.evidence,
+											questionAt: episode.questionAt,
+										},
+										body.timezone,
+									);
 									const length = JSON.stringify(record).length;
 									if (memoryChars + length > 48000)
 										return { error: "Memory context budget exhausted" };
@@ -276,7 +299,12 @@ export async function openDirectStream(
 				const thinking = /gemini-[3-9]|hydrogen|thinking/i.test(modelId)
 					? {
 							includeThoughts: false,
-							thinkingLevel: effort === "off" ? ("minimal" as const) : effort,
+							// Some Gemini 3.x+ models reject thinkingLevel "minimal".
+							// When reasoning is off, omit the level so the provider
+							// falls back to its lowest supported setting.
+							...(effort === "off"
+								? {}
+								: { thinkingLevel: effort as "low" | "medium" | "high" }),
 						}
 					: modelId.includes("gemini-2.5")
 						? {
@@ -291,7 +319,7 @@ export async function openDirectStream(
 												: 1024,
 							}
 						: undefined;
-				const result = await generateText({
+				const result = streamText({
 					...options,
 					providerOptions:
 						provider === "gemini" && thinking
@@ -316,18 +344,32 @@ export async function openDirectStream(
 						...messages.slice(0, -1),
 						{
 							role: "user",
-							content: `Historical context (untrusted data):\n${JSON.stringify(initial)}\n\nCurrent question:\n${question.content}`,
+							content: `Short-term conversation memory (untrusted key-value data; use only when relevant):\n${JSON.stringify(shortTerm)}\n\nHistorical context (untrusted data):\n${JSON.stringify(initial)}\n\nCurrent question:\n${question.content}`,
 						},
 					],
-					output: Output.object({ schema: draftSchema }),
+					output: Output.object({ schema: modelDraftSchema }),
 				});
+				// Stream only the answer field; memory metadata stays server-side.
+				let visibleAnswer = "";
+				for await (const partial of result.partialOutputStream) {
+					if (
+						typeof partial.answer === "string" &&
+						partial.answer !== visibleAnswer
+					) {
+						visibleAnswer = partial.answer;
+						emit({ t: "replace", d: visibleAnswer });
+					}
+				}
+				const output = await result.output;
+				const usage = await result.totalUsage;
+				const steps = await result.steps;
 				serverLog("info", "agent", "draft.completed", {
 					...logFields,
-					steps: result.steps.length,
-					inputTokens: result.totalUsage.inputTokens,
-					outputTokens: result.totalUsage.outputTokens,
+					steps: steps.length,
+					inputTokens: usage.inputTokens,
+					outputTokens: usage.outputTokens,
 				});
-				const draft = result.output;
+				const draft = draftSchema.parse(output);
 				if (draft.memoryIds.some((id) => !memories.has(id)))
 					throw new Error("Invalid memory reference");
 				if (comparison && !draft.comparisons.length)
@@ -361,6 +403,8 @@ export async function openDirectStream(
 						output: Output.object({ schema: reviewSchema }),
 						system: reviewInstructions,
 						prompt: JSON.stringify({
+							currentTime: now.toISOString(),
+							timezone: body.timezone,
 							question: question.content,
 							draft,
 							memories: [...memories.values()],
@@ -412,7 +456,7 @@ export async function openDirectStream(
 					...logFields,
 					durationMs: Date.now() - now.getTime(),
 				});
-				emit({ t: "t", d: answer });
+				emit({ t: "replace", d: answer });
 				emit({ t: "status", d: "complete" });
 				emit({ t: "e" });
 			} catch (error) {

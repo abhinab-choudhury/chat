@@ -287,3 +287,93 @@ test("historical context keeps source IDs and bounds excerpts", async () => {
 	assert.ok(JSON.stringify(record).length < 24000);
 	assert.equal(record.evidence.evidence.length, 5);
 });
+
+test("historical timestamps anchor relative dates independently of the current year", async () => {
+	const { episodeExcerpt } = await import("../src/lib/memory/context");
+	// Stored SQL bigint values may arrive as strings; local date differs from UTC.
+	const source = episodeExcerpt(
+		{
+			question_at: String(Date.parse("2025-11-17T20:00:00Z")),
+			question: "I went hiking yesterday. I am 25.",
+		},
+		"Asia/Kolkata",
+	);
+	assert.deepEqual(source.temporalContext, {
+		recordedAt: "2025-11-17T20:00:00.000Z",
+		localDate: "2025-11-18",
+		timezone: "Asia/Kolkata",
+	});
+	assert.equal(
+		resolveDate(
+			"yesterday",
+			new Date(source.temporalContext?.recordedAt ?? ""),
+			"Asia/Kolkata",
+		)?.label,
+		"2025-11-17 (Asia/Kolkata)",
+	);
+	assert.equal(
+		resolveDate("yesterday", new Date("2026-11-18T12:00:00Z"), "Asia/Kolkata")
+			?.label,
+		"2026-11-17 (Asia/Kolkata)",
+	);
+	assert.equal(source.question, "I went hiking yesterday. I am 25.");
+});
+
+test("missing or invalid memory timestamps are explicit rather than fabricated", async () => {
+	const { episodeExcerpt } = await import("../src/lib/memory/context");
+	for (const questionAt of [undefined, null, "", "not-a-date", Infinity]) {
+		assert.equal(episodeExcerpt({ questionAt }).temporalContext, null);
+	}
+	assert.equal(
+		episodeExcerpt({ questionAt: 0 }).temporalContext?.recordedAt,
+		"1970-01-01T00:00:00.000Z",
+	);
+});
+
+test("last Friday is resolved against the request date and timezone", () => {
+	assert.equal(
+		resolveDate("last Friday", now, "UTC")?.label,
+		"2026-11-13 (UTC)",
+	);
+	assert.equal(
+		resolveDate("last Friday", new Date("2027-11-17T12:00:00Z"), "UTC")?.label,
+		"2027-11-12 (UTC)",
+	);
+});
+
+test("long embeddings include the entire message in bounded requests and pool every chunk", async () => {
+	const inputs: string[] = [];
+	const text = `${"a".repeat(1000)}${"b".repeat(1000)}tail-🙂`;
+	const vector = await embedText(text, false, (async (_url, init) => {
+		const body = JSON.parse(String(init?.body));
+		inputs.push(body.input);
+		assert.equal(body.truncate, false);
+		const embedding = Array(1024).fill(0);
+		embedding[inputs.length - 1] = 1;
+		return Response.json({ embeddings: [embedding] });
+	}) as typeof fetch);
+	assert.equal(inputs.join(""), text);
+	assert.equal(inputs.length, 3);
+	assert.ok(inputs.every((input) => Array.from(input).length <= 1000));
+	assert.ok(vector[0] > 0 && vector[1] > 0 && vector[2] > 0);
+	assert.ok(Math.abs(Math.hypot(...vector) - 1) < 1e-10);
+});
+
+test("failed long embeddings retry the failed chunk and reuse completed chunks", async () => {
+	const inputs: string[] = [];
+	let fail = true;
+	const text = `${"retry-first-".repeat(100)}retry-last`;
+	const fetcher = (async (_url, init) => {
+		const { input } = JSON.parse(String(init?.body));
+		inputs.push(input);
+		if (input.endsWith("retry-last") && fail) {
+			fail = false;
+			throw new DOMException("timeout", "TimeoutError");
+		}
+		return Response.json({ embeddings: [Array(1024).fill(0.1)] });
+	}) as typeof fetch;
+	await assert.rejects(embedText(text, false, fetcher), /timeout/);
+	await embedText(text, false, fetcher);
+	assert.equal(inputs.length, 3);
+	assert.equal(inputs[1], inputs[2]);
+});

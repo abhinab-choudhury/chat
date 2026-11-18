@@ -19,6 +19,7 @@ export const toolCallSchema = z.object({
 const streamEventSchema = z.discriminatedUnion("t", [
 	z.object({ t: z.literal("status"), d: z.custom<AgentPhase>(isAgentPhase) }),
 	z.object({ t: z.literal("t"), d: z.string() }),
+	z.object({ t: z.literal("replace"), d: z.string() }),
 	z.object({ t: z.literal("r"), d: z.string() }),
 	z.object({ t: z.literal("tool"), d: z.string() }),
 	z.object({ t: z.literal("err"), d: z.string() }),

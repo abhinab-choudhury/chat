@@ -7,7 +7,9 @@ import {
 	memoryFacts,
 	memoryJobs,
 } from "#/database/memory";
+import { serverLog } from "../server-logging";
 import { EMBEDDING_MODEL, embedText } from "./embeddings.server";
+import { selectShortTermMemory, shortTermWindow } from "./short-term";
 import { reciprocalRankFusion, resolveDate } from "./temporal";
 export async function threadContext(threadId: string) {
 	const rows = await db
@@ -15,24 +17,19 @@ export async function threadContext(threadId: string) {
 		.from(chatMessages)
 		.where(eq(chatMessages.threadId, threadId))
 		.orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
-		.limit(50);
-	const context = [];
-	let budget = 24000;
-	for (const row of rows) {
-		if (row.role !== "user" && row.role !== "assistant") continue;
-		if (row.content.length > budget && context.length) break;
-		context.push({
-			role: row.role as "user" | "assistant",
-			content: row.content.slice(0, budget),
-		});
-		budget -= row.content.length;
-		if (budget <= 0) break;
-	}
+		.limit(21);
+	const question = rows.find((m) => m.role === "user");
+	const window = shortTermWindow(rows.filter((row) => row.id !== question?.id));
+	const shortTerm = selectShortTermMemory(window, question?.content ?? "");
 	return {
-		messages: context.reverse(),
-		question: rows.find((m) => m.role === "user"),
+		messages: question
+			? [{ role: "user" as const, content: question.content }]
+			: [],
+		shortTerm,
+		question,
 	};
 }
+
 export async function recall(
 	userId: string,
 	query: string,
@@ -244,9 +241,8 @@ export async function drainMemoryJobs() {
 				.from(memoryJobs)
 				.where(
 					and(
-						sql`${memoryJobs.state} IN ('pending', 'running')`,
+						sql`${memoryJobs.state} IN ('pending', 'running', 'failed')`,
 						sql`${memoryJobs.nextAttemptAt} <= ${Date.now()}`,
-						sql`${memoryJobs.attempts} < 3`,
 					),
 				)
 				.orderBy(asc(memoryJobs.nextAttemptAt))
@@ -264,6 +260,15 @@ export async function drainMemoryJobs() {
 			return row;
 		});
 		if (!job) return;
+		// Renew the lease while long episodes are processed chunk by chunk.
+		const heartbeat = setInterval(() => {
+			void db
+				.update(memoryJobs)
+				.set({ nextAttemptAt: Date.now() + 300000 })
+				.where(and(eq(memoryJobs.id, job.id), eq(memoryJobs.state, "running")))
+				.catch(() => {});
+		}, 60000);
+		heartbeat.unref();
 		try {
 			const [episode] = await db
 				.select()
@@ -309,14 +314,23 @@ export async function drainMemoryJobs() {
 					.set({ state: "complete" })
 					.where(eq(memoryJobs.id, job.id));
 			});
-		} catch {
+		} catch (error) {
+			serverLog("warn", "memory", "embedding.retry", {
+				episodeId: job.episodeId,
+				attempt: job.attempts + 1,
+				errorType: error instanceof Error ? error.name : "UnknownError",
+			});
 			await db
 				.update(memoryJobs)
 				.set({
-					state: job.attempts >= 2 ? "failed" : "pending",
-					nextAttemptAt: Date.now() + 60000 * 2 ** job.attempts,
+					state: "pending",
+					nextAttemptAt:
+						Date.now() +
+						Math.min(3600000, 60000 * 2 ** Math.min(job.attempts, 6)),
 				})
 				.where(eq(memoryJobs.id, job.id));
+		} finally {
+			clearInterval(heartbeat);
 		}
 	} finally {
 		draining = false;

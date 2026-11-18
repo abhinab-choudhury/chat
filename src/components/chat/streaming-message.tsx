@@ -37,7 +37,7 @@ export function StreamingMessage({
 				className="w-full max-w-none flex-col items-start gap-1"
 			>
 				<MessageContent className="select-text w-full text-sm">
-					{status && !streamingText ? (
+					{status ? (
 						<output
 							aria-live="polite"
 							className="mb-2 text-xs text-muted-foreground"

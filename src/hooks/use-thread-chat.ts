@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 import type { AgentPhase } from "#/lib/agent/progress";
 import {
 	chatData,
@@ -40,7 +41,6 @@ export interface UseThreadChatResult {
 	pendingAutoSend: boolean;
 	streamingText: string;
 	agentPhase: AgentPhase;
-	chatError: string | null;
 	streamingReasoning: string;
 	streamingToolCalls: WebSearchToolCall[];
 	webSearchEnabled: boolean;
@@ -114,7 +114,6 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 		!!thread && !!currentUserId && thread.userId === currentUserId;
 
 	const [agentPhase, setAgentPhase] = React.useState<AgentPhase>("preparing");
-	const [chatError, setChatError] = React.useState<string | null>(null);
 	const [streamingText, setStreamingText] = React.useState("");
 	const [streamingReasoning, setStreamingReasoning] = React.useState("");
 	const [streamingToolCalls, setStreamingToolCalls] = React.useState<
@@ -130,7 +129,6 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 	// previous thread's in-flight stream doesn't leak into this one's UI.
 	React.useEffect(() => {
 		setThreadId(threadId);
-		setChatError(null);
 		setAgentPhase("preparing");
 		autoSentRef.current = false;
 		resumedRef.current = false;
@@ -159,7 +157,6 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 			sendingRef.current = true;
 			setBusy(true);
 			setAgentPhase("preparing");
-			setChatError(null);
 			if (sendUser && !override) setInput("");
 			try {
 				if (sendUser && trimmed) {
@@ -246,7 +243,7 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 				setStreamingToolCalls([]);
 			} catch (e) {
 				if (!(e instanceof Error && e.name === "AbortError")) {
-					setChatError(
+					toast.error(
 						e instanceof Error ? e.message : "Unable to complete the response.",
 					);
 					console.error(e);
@@ -328,7 +325,10 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 					`/api/chat/${thread.currentStreamId}/stream?${params.toString()}`,
 					{ signal: controller.signal },
 				);
-				if (res.status === 204 || !res.ok || !res.body) {
+				if (!res.ok) {
+					throw new Error("Unable to resume the response. Please retry.");
+				}
+				if (res.status === 204 || !res.body) {
 					await refreshChats(threadId);
 					return;
 				}
@@ -345,7 +345,7 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 				setStreamingToolCalls([]);
 			} catch (e) {
 				if (controller.signal.aborted) return;
-				setChatError(
+				toast.error(
 					e instanceof Error ? e.message : "Unable to resume the response.",
 				);
 				console.error(e);
@@ -410,7 +410,6 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 		pendingAutoSend,
 		streamingText,
 		agentPhase,
-		chatError,
 		streamingReasoning,
 		streamingToolCalls,
 		webSearchEnabled,

@@ -78,13 +78,13 @@ There is no account authentication. The browser creates an `anon-…` ID in loca
 7. Deterministic checks validate memory references and comparison provenance. Comparison prompts, attempted web searches, or current-information keywords trigger a separate structured review using the same selected model. Review moves the run to `reviewing`.
 8. Review can support, qualify or block an answer. A blocked review produces an explanatory response and disables memory archival for that turn. Reviewed answers also pass URL citation checks.
 9. `commitAnswer` locks and validates the active run, thread claim and unchanged source question. One transaction inserts the assistant message and evidence metadata, completes the run, releases the claim, and—if memory archival is enabled—creates the episode, fact versions and embedding job.
-10. Only after commit does the producer emit final answer text and the terminal event. Failure marks the run failed when possible, emits a public error, and releases the stream claim in cleanup.
+10. Draft answer text is streamed before review using replacement events. After commit, the producer replaces it with the saved final answer and emits the terminal event. Failure marks the run failed when possible, emits a public error, and releases the stream claim in cleanup.
 
 The actual run states used here are `running`, `reviewing`, `complete` and `failed`; dispatch also rejects a pre-existing `cancelled` state. There is no separate durable generation queue.
 
 ## Streaming and recovery
 
-The wire protocol carries preparation/status events, web-tool summaries, answer text, errors and an end marker. The client reader also supports reasoning events, but the current server pipeline buffers the answer rather than streaming model reasoning or unreviewed tokens. The transport tees and drains the producer so client disconnection does not itself stop persistence.
+The wire protocol carries preparation/status events, web-tool summaries, answer text replacements, errors and an end marker. The server streams the draft answer field as it becomes available, then replaces it with the reviewed, saved answer after commit. Draft text is provisional and may be unsupported. The client reader also supports reasoning events; structured memory metadata stays server-side. The transport tees and drains the producer so client disconnection does not itself stop persistence.
 
 Redis replay is optional and replays the buffered stream from its beginning. Registration failures fall back to direct delivery. A generation lease expires after 30 seconds and is refreshed every 10 seconds. Recovery gives a new claim 30 seconds before checking liveness; without Redis it tolerates claims younger than six minutes. Missing/expired producers can be marked failed when history or dispatch triggers recovery. Reload replay does not restart a model request, and a process crash does not resume generation computation.
 

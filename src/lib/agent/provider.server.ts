@@ -180,18 +180,41 @@ export function agentModel(requested?: string) {
 	return { ...selected, model };
 }
 
+/** Provider errors are usually wrapped; find the first status in the cause chain. */
+function errorStatus(error: unknown) {
+	let current: unknown = error;
+	for (let depth = 0; depth < 4 && current; depth++) {
+		if (
+			typeof current === "object" &&
+			"statusCode" in current &&
+			typeof current.statusCode === "number"
+		)
+			return current.statusCode;
+		current =
+			typeof current === "object" && "cause" in current
+				? current.cause
+				: undefined;
+	}
+	return undefined;
+}
+
 export function modelErrorMessage(error: unknown) {
-	const status =
-		error && typeof error === "object" && "statusCode" in error
-			? error.statusCode
-			: undefined;
+	const status = errorStatus(error);
 	if (status === 401 || status === 403)
 		return "The selected provider rejected access. Check its API key and model permissions.";
 	if (status === 404)
 		return "The selected model is unavailable for this API account. Choose another model or check model access.";
+	if (status === 400)
+		return "The selected model rejected the request format (400). This usually means the model does not support this request's structured output; choose another model.";
 	if (status === 503)
 		return "The selected model provider is temporarily unavailable or overloaded (503). Please try again shortly.";
 	if (status === 429)
 		return "The selected provider's rate limit or API quota was reached. Check API billing and wait before retrying.";
+	const name =
+		error && typeof error === "object" && "name" in error
+			? String(error.name)
+			: "";
+	if (name === "AI_NoObjectGeneratedError" || name === "NoObjectGeneratedError")
+		return "The selected model returned an unreadable structured response. Please retry or choose another model.";
 	return "Unable to complete a verified answer. The selected model provider may be busy; please wait a minute before retrying.";
 }

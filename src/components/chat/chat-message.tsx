@@ -77,21 +77,26 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 				align={isUser ? "end" : "start"}
 				className={cn(
 					isUser
-						? "w-fit max-w-[85%] flex-col items-end gap-1 sm:max-w-[75%]"
+						? cn(
+								"max-w-[90%] flex-col items-end gap-1 data-[align=end]:flex-col sm:max-w-[75%]",
+								editing ? "w-full" : "w-fit",
+							)
 						: "w-full max-w-none flex-col items-start gap-1",
 				)}
 			>
 				{isUser && editing ? (
-					<div className="flex w-full flex-col gap-2">
+					<div className="flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
 						<textarea
+							aria-label="Edit message"
+							rows={6}
 							value={editingText}
 							onChange={(e) => setEditingText(e.target.value)}
-							className="min-h-10 w-full resize-none rounded-2xl border border-border bg-card px-3 py-2 text-sm outline-none"
+							className="min-h-40 max-h-[60vh] w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-base leading-relaxed outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 sm:text-sm"
 						/>
 						<div className="flex justify-end gap-2">
 							<Button
 								type="button"
-								size="xs"
+								size="sm"
 								variant="ghost"
 								onClick={() => {
 									setEditing(false);
@@ -100,7 +105,7 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 							>
 								Cancel
 							</Button>
-							<Button type="button" size="xs" onClick={() => void saveEdit()}>
+							<Button type="button" size="sm" onClick={() => void saveEdit()}>
 								Save
 							</Button>
 						</div>
@@ -193,9 +198,9 @@ export function ChatMessageItem({ message, onRetry }: ChatMessageItemProps) {
 						</MessageContent>
 						<div
 							className={cn(
-								"mt-1 flex items-center gap-1 transition-all duration-200",
+								"mt-1 flex items-center gap-1 transition-opacity duration-200",
 								isUser
-									? "justify-end opacity-0 group-hover/message:opacity-100 focus-within:opacity-100"
+									? "justify-end pr-1 opacity-100 sm:opacity-0 sm:group-hover/message:opacity-100 sm:focus-within:opacity-100"
 									: "justify-start",
 							)}
 						>

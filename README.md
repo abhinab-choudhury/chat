@@ -41,7 +41,8 @@ request after startup and then every minute. Older chats are not silently backfi
 Memory off keeps current-thread context but disables cross-thread recall and new
 memory writes. Forgetting removes derived memory, not the original chat.
 
-Research answers are buffered, reviewed, and saved before delivery. Evidence,
+Draft answers stream while generation runs. Research answers are reviewed and saved,
+then replace the provisional draft. Evidence,
 comparison verdicts, and memory references are saved with each answer. Search
 currently uses excerpts; missing historical evidence is not proof of a change.
 Model requests are serialized per provider per Node process, paced, and retried once for

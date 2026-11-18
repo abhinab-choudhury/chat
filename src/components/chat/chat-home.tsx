@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 // convex removed
 import * as React from "react";
+import { toast } from "sonner";
 import { LogoSymbol } from "#/components/logo";
 import { Message, MessageContent } from "#/components/ui/message";
 import {
@@ -132,6 +133,11 @@ export function ChatHome() {
 			setPendingAutoSend(true);
 			void navigate({ to: "/thread/$threadId", params: { threadId } });
 		} catch (e) {
+			toast.error(
+				e instanceof Error
+					? e.message
+					: "Unable to start the chat. Please retry.",
+			);
 			console.error(e);
 			setOptimisticMessage(null);
 			setMessage(trimmed);

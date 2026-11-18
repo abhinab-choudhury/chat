@@ -88,3 +88,36 @@ test("terminal event completes even if upstream keeps the connection open", asyn
 	await consumeChatStream(body, { onText: () => {}, onReasoning: () => {} });
 	assert.equal(cancelled, true);
 });
+
+test("draft is visible before completion and review replaces it without duplication", async () => {
+	let controller!: ReadableStreamDefaultController<Uint8Array>;
+	const body = new ReadableStream<Uint8Array>({
+		start(c) {
+			controller = c;
+		},
+	});
+	const send = (event: unknown) =>
+		controller.enqueue(new TextEncoder().encode(`${JSON.stringify(event)}\n`));
+	let draftVisible!: () => void;
+	const visible = new Promise<void>((resolve) => {
+		draftVisible = resolve;
+	});
+	const seen: string[] = [];
+	const consuming = consumeChatStream(body, {
+		onText: (text) => {
+			seen.push(text);
+			draftVisible();
+		},
+		onReasoning: () => {},
+	});
+	send({ t: "replace", d: "Draft" });
+	await visible;
+	assert.deepEqual(seen, ["Draft"]);
+	send({ t: "replace", d: "Draft answer" });
+	send({ t: "status", d: "validating" });
+	send({ t: "replace", d: "Corrected answer ✓" });
+	send({ t: "e" });
+	const result = await consuming;
+	assert.deepEqual(seen, ["Draft", "Draft answer", "Corrected answer ✓"]);
+	assert.equal(result.text, "Corrected answer ✓");
+});

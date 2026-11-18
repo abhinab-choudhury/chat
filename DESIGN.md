@@ -20,9 +20,9 @@ A useful answer should distinguish what the assistant said before from what the 
 
 The user writes a question and chooses whether to enable Memory and Web Search. The server saves the question, loads relevant context, and asks the selected model to prepare an answer.
 
-When Memory is enabled, the assistant can look up earlier conversations. When Web Search is enabled and configured, it can search for current information. Research and comparison answers go through an additional review step before they are saved and shown.
+When Memory is enabled, the assistant can look up earlier conversations. When Web Search is enabled and configured, it can search for current information. Research and comparison answers go through an additional review step before the final answer is saved.
 
-The interface shows progress while this happens. Final answer text arrives after it has been saved. It does not appear word by word while the model is drafting. This adds waiting time, but allows the application to check and save the answer before presenting it.
+The interface shows progress and draft answer text while the model is working. That draft is provisional: review can change it or replace it with an explanation of what could not be verified. After saving, the server replaces the displayed draft with the final answer. This makes the interface more responsive, but means users can see text before it has been checked.
 
 ## Architecture choices
 

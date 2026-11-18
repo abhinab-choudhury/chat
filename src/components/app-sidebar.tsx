@@ -179,32 +179,25 @@ export function AppSidebar() {
 				</SidebarGroup>
 			</SidebarContent>
 			<SidebarFooter>
-				<Button
-					variant="ghost"
-					className="justify-start"
-					onClick={() => {
-						void navigate({ to: "/library" });
-						setOpenMobile(false);
-					}}
-					title="Memory"
-				>
-					<BookOpenIcon className="mr-2 size-4" />
-					{!collapsed && "Memory"}
-				</Button>
-				<div className="flex flex-col gap-1 p-2">
-					<Button
-						asChild
-						variant="ghost"
-						size="sm"
-						className="w-full justify-start"
-						title="Settings"
-					>
-						<Link to="/settings">
-							<SettingsIcon className="mr-2 size-4" />
-							{!collapsed ? <span>Settings</span> : null}
-						</Link>
-					</Button>
-				</div>
+				<SidebarMenu>
+					{[
+						{ to: "/library", label: "Memory", icon: BookOpenIcon },
+						{ to: "/settings", label: "Settings", icon: SettingsIcon },
+					].map(({ to, label, icon: Icon }) => (
+						<SidebarMenuItem key={to}>
+							<SidebarMenuButton
+								asChild
+								tooltip={label}
+								isActive={location.pathname === to}
+							>
+								<Link to={to} onClick={() => setOpenMobile(false)}>
+									<Icon className="size-4 shrink-0" />
+									{!collapsed && <span>{label}</span>}
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					))}
+				</SidebarMenu>
 			</SidebarFooter>
 			<SidebarRail />
 			<RenameThreadDialog
