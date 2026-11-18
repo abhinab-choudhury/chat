@@ -119,8 +119,120 @@ Three useful manual checks are:
 
 Live answer accuracy, retrieval quality, cost per turn, and response time still need measurement. [docs/memory-evaluation.md](docs/memory-evaluation.md) records earlier verification and its limits.
 
-## What should improve next
+## Future architecture plans
 
-The first priority is to measure how often the assistant finds the right conversation and supports its comparisons with evidence. Those results should guide changes to retrieval and review.
+These are proposed changes, not implemented capabilities. The plan builds on the current PostgreSQL architecture described in [ARCHITECTURE.md](ARCHITECTURE.md). The older Convex/Supermemory description in `docs/next-week-plan.md` does not describe the current application or this roadmap.
 
-Before a public release, the application needs authenticated accounts, usage controls, and a tested backup and restore process. Other useful improvements include full-page source reading, clearer memory correction and deletion tools, and generation jobs that can recover after a server restart. These are future work, not existing features.
+### 1. Measure answer quality before changing retrieval
+
+**Decision:** Create a versioned evaluation set covering cross-thread recall, exact dates, corrected facts, pricing comparisons, missing evidence, and questions that should receive an “unverified” answer. Keep deterministic engineering tests and live model evaluations separate.
+
+**Why:** The documented 48-test pass establishes behavior for those fixtures; it does not establish a real-world answer success rate. Measurements should identify whether failures come from retrieval, source quality, or generation before adding more infrastructure.
+
+**Tradeoff:** Human labeling and live evaluations take time and API budget. Use a small repeatable set first, with a held-out set to check improvements. Record model, prompt, embedding, and dataset versions so results remain interpretable.
+
+**Validation:** Report retrieval recall@k (whether expected memories appear among the top k results), claim-support precision (the fraction of checked claims supported by cited evidence), correct abstention on insufficient-evidence cases, and end-to-end task success. Define task success as satisfying the question's labeled rubric without unsupported material claims. Publish sample counts, failure categories, cost per completed turn, and median/p95 time to first draft and final answer. Establish a baseline before choosing numerical release targets.
+
+### 2. Keep a modular application and one authoritative database
+
+**Decision:** Retain TanStack Start and PostgreSQL/pgvector. Make orchestration, retrieval, evidence collection, provider access, and persistence explicit module boundaries. Introduce a separately running worker from the same codebase when durable jobs are added.
+
+**Why:** The existing stack can support the next stage without migrating chat history or operating a second authoritative data store. Clear boundaries allow retrieval and provider changes to be tested independently.
+
+**Tradeoff:** PostgreSQL serves both transactional and retrieval workloads. Measure query plans, index size, and contention; consider a dedicated search service only when measured load or retrieval requirements justify its synchronization cost.
+
+**Validation:** Load-test representative chat and recall traffic together. Preserve atomic answer/memory commits, owner filtering, and stable run IDs across module changes.
+
+### 3. Add authenticated ownership before public access
+
+**Decision:** Replace the client-controlled anonymous scope with server-verified sessions and account ownership. Apply ownership checks to history, memory, tools, jobs, and stream replay. Only introduce workspace roles if shared conversations become a product requirement.
+
+**Why:** The current cookie groups local demo data but does not prove identity. Public users need durable access across devices and enforceable isolation.
+
+**Tradeoff:** Accounts add session management, recovery, and migration work. Do not transfer existing anonymous history to an account solely because it supplies the old identifier; define an explicit, trusted migration process for local data.
+
+**Validation:** Test unauthenticated access, expired sessions, guessed resource IDs, cross-account reads/writes, and stream subscription access. A worker must recheck ownership and source eligibility before publishing results.
+
+### 4. Make generation and indexing recoverable jobs
+
+**Decision:** Persist generation requests and job state in PostgreSQL, then let a dedicated worker claim jobs using leases, heartbeats, bounded retries, and attempt IDs. Start the embedding worker independently of incoming chat requests. Commit a request and its job atomically.
+
+**Why:** Browser disconnection is already handled, but a server crash loses ongoing model computation. Durable scheduling allows abandoned work to be detected and retried without waiting for another user request.
+
+**Tradeoff:** A retry may repeat a paid model call; it cannot resume a provider's interrupted computation. Use at-least-once execution with idempotent final commits, and reject writes from expired attempts. Checkpoint completed tool evidence where safe, with freshness checks before reuse. Define cancellation and retry budgets explicitly.
+
+**Validation:** Kill workers during generation, review, and commit. Confirm jobs recover or reach a visible terminal failure, stale workers cannot overwrite newer attempts, and only one final answer and eligible memory episode commit per run.
+
+### 5. Strengthen evidence before adding more review calls
+
+**Decision:** Add bounded full-page reading for selected search results and store the supporting passage, URL, retrieval time, and content version/hash. Represent comparison claims with structured fields such as plan, currency, region, seat count, and billing period. Treat retrieved content as untrusted data, and restrict fetching to public HTTP(S) destinations with redirect, size, and timeout checks.
+
+**Why:** Search excerpts can omit conditions that determine whether prices are comparable. A second model pass cannot reliably compensate for missing source evidence. A newly captured page also cannot prove what the page said historically.
+
+**Tradeoff:** Fetching and storing passages adds latency, storage, and retention decisions. Read only the sources needed for the claim. Evaluate an independent reviewer for difficult comparisons only if it improves measured quality enough to justify extra cost; it still does not guarantee correctness.
+
+**Validation:** Test mismatched billing periods, stale pages, conflicting sources, missing historical evidence, malicious page instructions, and inaccessible URLs. Present a change as verified only when comparable historical and current evidence supports it; otherwise qualify or abstain.
+
+### 6. Improve memory selection and correction
+
+**Decision:** Preserve exact-date lookup and hybrid keyword/vector retrieval. Use evaluation failures to decide whether to add reranking and source-linked summaries for long threads. Version derived memories and embeddings so source edits can invalidate old versions and enqueue replacements.
+
+**Why:** Term matching can miss relevant context, and current source edits exclude stale memory without automatically rebuilding it. Users need corrections to propagate consistently.
+
+**Tradeoff:** Reranking and summaries add latency or model cost, and summaries may lose details. Keep original messages authoritative and make summaries traceable to them. Never let relevance ranking silently truncate a request for all conversations on a date.
+
+**Validation:** Measure recall and task success against the baseline, including paraphrases and older context. Verify edited, archived, forgotten, and superseded records stay excluded during rebuilds. Use version checks to prevent a delayed job from restoring deleted memory. Embedding-model changes require a versioned reindex and an explicit cutover.
+
+### 7. Enforce shared budgets and observe completed outcomes
+
+**Decision:** Before running multiple application or worker instances, move provider concurrency and quota coordination into a shared store. Add per-account usage limits, an end-to-end deadline, and budgets for generation, review, search, and retries. Reserve estimated usage before calls and reconcile actual usage afterward.
+
+**Why:** The current process-local gate cannot coordinate multiple workers or enforce account-wide budgets. Opening a successful HTTP stream does not mean an answer completed successfully.
+
+**Tradeoff:** Shared coordination introduces contention and another failure mode. Define conservative behavior when budget state is unavailable, and keep provider switching explicit to the user.
+
+**Validation:** Exercise concurrent workers, rate limits, provider outages, cancellations, and exhausted budgets. Correlate request/run IDs across retrieval, tools, review, and commit. Track completed/failed runs, queue age, retry counts, token usage, and cost without recording raw conversation content in operational logs.
+
+### 8. Make recovery and user data controls operational
+
+**Decision:** Define PostgreSQL backup frequency and retention from acceptable data loss and recovery time, and rehearse restoration into an isolated environment. Add clear export, memory correction, and separate actions for forgetting derived memory versus deleting original conversations. Document when deleted data expires from backups.
+
+**Why:** PostgreSQL is the source of truth; browser caches and Redis replay cannot recover lost history. Users should understand and control which data remains stored.
+
+**Tradeoff:** Backups and retained evidence increase storage and operational work. Deletion must also invalidate jobs, vectors, cached results, and replay buffers; restored backups need deletion reconciliation before serving users.
+
+**Validation:** Demonstrate a restore within the chosen recovery objectives and verify deletions remain effective after retries and restoration. Keep Redis an optional delivery aid; final history must remain recoverable from PostgreSQL.
+
+### Proposed flow after these changes
+
+```text
+React client → authenticated TanStack API
+                         ↓
+             PostgreSQL: question + durable job
+                         ↓
+                 worker claims attempt
+                         ↓
+         bounded context + date/keyword/vector recall
+                         ↓
+              Gemini / OpenAI ↔ evidence tools
+                         ↓
+               validate + conditional review
+                         ↓
+       atomic answer + evidence + memory + indexing job
+                  ↓                       ↓
+        final history / stream       Ollama worker
+                                          ↓
+                                  versioned embeddings
+
+Shared budgets apply to external calls.
+Redis may replay progress; PostgreSQL owns durable state.
+```
+
+### Delivery order
+
+1. **Measure:** Establish the quality, latency, and cost baseline; keep the current architecture while identifying the largest failures.
+2. **Prepare for public use:** Add authenticated ownership, enforce usage budgets, rehearse backup restoration, and define data deletion behavior before exposing the service publicly.
+3. **Improve answer quality:** Add source reading and structured comparisons, then change retrieval only where the evaluation shows a benefit.
+4. **Improve recovery and scale:** Add durable workers, attempt fencing, and independent indexing. Complete shared quota coordination before running multiple instances. Split additional services only when measured load warrants it.
+
+The intended outcome is better-supported answers, recoverable execution, and measurable operating costs. No success-rate improvement is claimed until the proposed changes are evaluated.
