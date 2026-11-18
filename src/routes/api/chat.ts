@@ -2,12 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { chatInput } from "#/lib/agent/core";
 import { openAgentStream } from "#/lib/agent/dispatch.server";
 import { createChatResponseStream } from "#/lib/agent/transport";
+import { withApiLogging } from "#/lib/api-logging.server";
 import { getResumableStreamContext } from "#/lib/resumable-stream";
 
 export const Route = createFileRoute("/api/chat")({
 	server: {
 		handlers: {
-			POST: async ({ request }) => {
+			POST: withApiLogging("/api/chat", async ({ request }) => {
 				const parsed = chatInput.safeParse(
 					await request.json().catch(() => null),
 				);
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/api/chat")({
 						"X-Accel-Buffering": "no",
 					},
 				});
-			},
+			}),
 		},
 	},
 });

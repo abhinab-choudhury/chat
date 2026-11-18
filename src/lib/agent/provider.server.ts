@@ -1,16 +1,19 @@
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { modelProvider } from "../models";
+import { serverLog } from "../server-logging";
 
 /** One request at a time, including tool continuations and review calls. Intended for one Node process. */
 export function createProviderGate(
 	fetcher: typeof fetch = fetch,
 	intervalMs = 1500,
+	provider = "model",
 ) {
 	let tail: Promise<void> = Promise.resolve();
 	let pending = 0;
 	let nextAt = 0;
 	let cooldown = 0;
+	let cooldownStatus = 503;
 	return (async (input: RequestInfo | URL, init?: RequestInit) => {
 		if (pending >= 8)
 			throw new Error("Provider queue is full. Please try again shortly.");
@@ -22,10 +25,17 @@ export function createProviderGate(
 		});
 		await previous;
 		try {
-			if (Date.now() < cooldown)
-				throw new Error(
-					"Model provider is busy. Please wait a minute before retrying.",
+			if (Date.now() < cooldown) {
+				serverLog("warn", "provider", "request.blocked", {
+					provider,
+					status: cooldownStatus,
+					retryAfterMs: cooldown - Date.now(),
+				});
+				throw Object.assign(
+					new Error("Model provider is busy. Please wait before retrying."),
+					{ statusCode: cooldownStatus },
 				);
+			}
 			const signal = init?.signal;
 			const wait = async (ms: number) => {
 				if (ms <= 0) return;
@@ -45,7 +55,54 @@ export function createProviderGate(
 			await wait(nextAt - Date.now());
 			for (let attempt = 0; ; attempt++) {
 				signal?.throwIfAborted();
+				const started = performance.now();
 				const response = await fetcher(input, init);
+				const diagnostics: Record<string, string | number> = {};
+				for (const name of [
+					"x-ratelimit-limit-requests",
+					"x-ratelimit-remaining-requests",
+					"x-ratelimit-limit-tokens",
+					"x-ratelimit-remaining-tokens",
+					"x-ratelimit-reset-requests",
+					"x-ratelimit-reset-tokens",
+					"retry-after",
+				]) {
+					const value = response.headers.get(name);
+					if (value && /^[0-9.ms h-]{1,64}$/.test(value))
+						diagnostics[name] = value;
+				}
+				if (response.status === 429 || response.status === 503) {
+					const payload = await response
+						.clone()
+						.json()
+						.catch(() => null);
+					const code =
+						typeof payload?.error?.code === "string"
+							? payload.error.code
+							: payload?.error?.status;
+					if (
+						[
+							"insufficient_quota",
+							"rate_limit_exceeded",
+							"RESOURCE_EXHAUSTED",
+							"UNAVAILABLE",
+						].includes(code)
+					)
+						diagnostics.reason = code;
+				}
+				serverLog(
+					response.status >= 400 ? "warn" : "info",
+					"provider",
+					"request.completed",
+					{
+						provider,
+						status: response.status,
+						attempt: attempt + 1,
+						queued: pending - 1,
+						durationMs: Math.round(performance.now() - started),
+						...diagnostics,
+					},
+				);
 				nextAt = Date.now() + intervalMs;
 				if (![429, 500, 502, 503, 504].includes(response.status))
 					return response;
@@ -59,10 +116,24 @@ export function createProviderGate(
 					Number.isFinite(retryMs) ? retryMs : 0,
 					2000 + Math.random() * 1000,
 				);
-				if (attempt || delay > 15000) {
-					cooldown = Date.now() + Math.max(60000, delay);
+				if (response.status === 429 || attempt || delay > 15000) {
+					cooldownStatus = response.status;
+					cooldown =
+						Date.now() +
+						Math.max(response.status === 429 ? 60000 : 2000, delay);
+					serverLog("warn", "provider", "cooldown.started", {
+						provider,
+						status: response.status,
+						retryAfterMs: cooldown - Date.now(),
+					});
 					return response;
 				}
+				serverLog("warn", "provider", "retry.scheduled", {
+					provider,
+					status: response.status,
+					nextAttempt: attempt + 2,
+					retryAfterMs: delay,
+				});
 				await response.body?.cancel();
 				await wait(delay);
 			}
@@ -72,8 +143,8 @@ export function createProviderGate(
 		}
 	}) as typeof fetch;
 }
-const guardedFetch = createProviderGate();
-const openaiFetch = createProviderGate();
+const guardedFetch = createProviderGate(fetch, 1500, "gemini");
+const openaiFetch = createProviderGate(fetch, 1500, "openai");
 export function googleProvider() {
 	const apiKey = process.env.GEMINI_API_KEY?.trim();
 	if (!apiKey) throw new Error("Set GEMINI_API_KEY on the server.");
@@ -118,6 +189,8 @@ export function modelErrorMessage(error: unknown) {
 		return "The selected provider rejected access. Check its API key and model permissions.";
 	if (status === 404)
 		return "The selected model is unavailable for this API account. Choose another model or check model access.";
+	if (status === 503)
+		return "The selected model provider is temporarily unavailable or overloaded (503). Please try again shortly.";
 	if (status === 429)
 		return "The selected provider's rate limit or API quota was reached. Check API billing and wait before retrying.";
 	return "Unable to complete a verified answer. The selected model provider may be busy; please wait a minute before retrying.";

@@ -14,10 +14,12 @@ import {
 } from "../memory/service.server";
 import { TemporalResolutionError } from "../memory/temporal";
 import { SerperSearchAdapter } from "../search/serper-search-adapter";
+import { requestLogContext, serverLog } from "../server-logging";
 import { getProviderConfig } from "../user-settings.server";
 import { validateComparisons } from "./comparison";
 import { createAgentOptions, normalizeResults } from "./core";
 import type { ChatRequest } from "./dispatch.server";
+import { errorMetadata } from "./logging";
 import { agentModel, modelErrorMessage } from "./provider.server";
 import { checkCitations, reviewInstructions, reviewSchema } from "./validation";
 
@@ -62,6 +64,12 @@ export async function openDirectStream(
 	const userId = body.userId;
 	if (!threadId || !runId || !userId) throw new Error("Missing run identity");
 	const now = new Date();
+	const logFields = {
+		requestId: requestLogContext.getStore()?.requestId ?? runId,
+		runId,
+		model: body.model,
+	};
+	serverLog("info", "agent", "generation.started", logFields);
 	const { messages, question } = await threadContext(threadId);
 	if (!question || messages.at(-1)?.role !== "user")
 		throw new Error("Save a new question before starting a response.");
@@ -313,6 +321,12 @@ export async function openDirectStream(
 					],
 					output: Output.object({ schema: draftSchema }),
 				});
+				serverLog("info", "agent", "draft.completed", {
+					...logFields,
+					steps: result.steps.length,
+					inputTokens: result.totalUsage.inputTokens,
+					outputTokens: result.totalUsage.outputTokens,
+				});
 				const draft = result.output;
 				if (draft.memoryIds.some((id) => !memories.has(id)))
 					throw new Error("Invalid memory reference");
@@ -353,6 +367,11 @@ export async function openDirectStream(
 							evidence,
 						}),
 					});
+					serverLog("info", "agent", "review.completed", {
+						...logFields,
+						inputTokens: reviewed.totalUsage.inputTokens,
+						outputTokens: reviewed.totalUsage.outputTokens,
+					});
 					review = { ...reviewed.output, checkedAt: Date.now() };
 					archiveAllowed = reviewed.output.status !== "blocked";
 					answer =
@@ -389,10 +408,19 @@ export async function openDirectStream(
 					},
 				});
 				committed = true;
+				serverLog("info", "agent", "generation.completed", {
+					...logFields,
+					durationMs: Date.now() - now.getTime(),
+				});
 				emit({ t: "t", d: answer });
 				emit({ t: "status", d: "complete" });
 				emit({ t: "e" });
 			} catch (error) {
+				serverLog("error", "agent", "generation.failed", {
+					...logFields,
+					durationMs: Date.now() - now.getTime(),
+					...errorMetadata(error),
+				});
 				await db
 					.update(agentRuns)
 					.set({

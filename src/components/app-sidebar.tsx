@@ -30,7 +30,7 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "#/components/ui/sidebar";
-import { chatData, useThreads } from "#/lib/chat-data";
+import { chatData, type Thread, useThreads } from "#/lib/chat-data";
 import { shortcutDisplay, shortcutKeys } from "#/lib/shortcuts";
 import { getCurrentUserId } from "#/lib/user-id";
 import { cn as classNames } from "#/lib/utils";
@@ -58,13 +58,11 @@ export function AppSidebar() {
 	const shortcuts = useModelStore((s) => s.shortcuts);
 
 	const userId = getCurrentUserId();
-	const threadsRaw = useThreads(userId);
-	const threads = threadsRaw as unknown as Array<{
-		_id: string;
-		title: string;
-		archived?: boolean;
-		updatedAt?: number;
-	}>;
+	const threads = useThreads(userId);
+	const visibleThreads = React.useMemo(
+		() => threads.filter((thread) => !thread.archived),
+		[threads],
+	);
 
 	const handleDeleteThread = (threadId: string) => {
 		if (!userId) return;
@@ -156,87 +154,20 @@ export function AppSidebar() {
 					<SidebarGroupLabel>Recent</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{(threads ?? [])
-								.filter((t) => !t.archived)
-								.map((thread) => {
-									const isActive =
-										location.pathname === `/thread/${thread._id}`;
-									return (
-										<SidebarMenuItem key={thread._id} className="group/thread">
-											<SidebarMenuButton
-												asChild
-												tooltip={thread.title}
-												isActive={isActive}
-												className="flex-1"
-											>
-												<Link
-													to="/thread/$threadId"
-													params={{ threadId: thread._id }}
-												>
-													{collapsed ? (
-														<MessageSquareIcon className="size-4" />
-													) : generatingTitleThreadIds.includes(thread._id) ? (
-														<span
-															className="inline-flex min-w-0 flex-1 items-center"
-															aria-hidden="true"
-														>
-															<span className="h-3.5 w-24 animate-pulse rounded bg-muted-foreground/20" />
-														</span>
-													) : (
-														<span className="truncate">{thread.title}</span>
-													)}
-												</Link>
-											</SidebarMenuButton>
-											{!collapsed ? (
-												<div
-													className={classNames(
-														"absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md pr-1 pl-6",
-														"bg-linear-to-l from-sidebar-accent from-60% to-transparent",
-														"opacity-70 transition-opacity duration-200",
-														"group-hover/thread:opacity-100",
-														"group-focus-within/thread:opacity-100",
-														"max-md:opacity-100",
-													)}
-												>
-													<Button
-														variant="ghost"
-														size="icon"
-														className="size-7 shrink-0 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground dark:text-foreground/90"
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															setRenamingThread({
-																id: thread._id,
-																title: thread.title,
-															});
-														}}
-														aria-label="Rename thread"
-													>
-														<PencilIcon className="size-3.5" />
-													</Button>
-													<Button
-														variant="ghost"
-														size="icon"
-														className="size-7 shrink-0 text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive dark:text-red-400 dark:hover:bg-destructive/20 dark:hover:text-red-300"
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															setDeletingThread({
-																id: thread._id,
-																title: thread.title,
-															});
-														}}
-														aria-label="Delete thread"
-													>
-														<Trash2Icon className="size-3.5" />
-													</Button>
-												</div>
-											) : null}
-										</SidebarMenuItem>
-									);
-								})}
-							{(!threads ||
-								threads.filter((t) => !t.archived).length === 0) && (
+							{visibleThreads.map((thread) => (
+								<ThreadHistoryItem
+									key={thread._id}
+									thread={thread}
+									isActive={location.pathname === `/thread/${thread._id}`}
+									collapsed={collapsed}
+									generatingTitle={generatingTitleThreadIds.includes(
+										thread._id,
+									)}
+									setRenamingThread={setRenamingThread}
+									setDeletingThread={setDeletingThread}
+								/>
+							))}
+							{visibleThreads.length === 0 && (
 								<SidebarMenuItem>
 									<SidebarMenuButton tooltip="No conversations yet">
 										{!collapsed ? <span>No conversations yet</span> : null}
@@ -306,3 +237,90 @@ export function AppSidebar() {
 		</Sidebar>
 	);
 }
+
+const ThreadHistoryItem = React.memo(function ThreadHistoryItem({
+	thread,
+	isActive,
+	collapsed,
+	generatingTitle,
+	setRenamingThread,
+	setDeletingThread,
+}: {
+	thread: Thread;
+	isActive: boolean;
+	collapsed: boolean;
+	generatingTitle: boolean;
+	setRenamingThread: (thread: { id: string; title: string }) => void;
+	setDeletingThread: (thread: { id: string; title: string }) => void;
+}) {
+	return (
+		<SidebarMenuItem className="group/thread">
+			<SidebarMenuButton
+				asChild
+				tooltip={thread.title}
+				isActive={isActive}
+				className="flex-1"
+			>
+				<Link to="/thread/$threadId" params={{ threadId: thread._id }}>
+					{collapsed ? (
+						<MessageSquareIcon className="size-4" />
+					) : generatingTitle ? (
+						<span
+							className="inline-flex min-w-0 flex-1 items-center"
+							aria-hidden="true"
+						>
+							<span className="h-3.5 w-24 animate-pulse rounded bg-muted-foreground/20" />
+						</span>
+					) : (
+						<span className="truncate">{thread.title}</span>
+					)}
+				</Link>
+			</SidebarMenuButton>
+			{!collapsed ? (
+				<div
+					className={classNames(
+						"absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md pr-1 pl-6",
+						"bg-linear-to-l from-sidebar-accent from-60% to-transparent",
+						"opacity-70 transition-opacity duration-200",
+						"group-hover/thread:opacity-100",
+						"group-focus-within/thread:opacity-100",
+						"max-md:opacity-100",
+					)}
+				>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-7 shrink-0 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground dark:text-foreground/90"
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							setRenamingThread({
+								id: thread._id,
+								title: thread.title,
+							});
+						}}
+						aria-label="Rename thread"
+					>
+						<PencilIcon className="size-3.5" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-7 shrink-0 text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive dark:text-red-400 dark:hover:bg-destructive/20 dark:hover:text-red-300"
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							setDeletingThread({
+								id: thread._id,
+								title: thread.title,
+							});
+						}}
+						aria-label="Delete thread"
+					>
+						<Trash2Icon className="size-3.5" />
+					</Button>
+				</div>
+			) : null}
+		</SidebarMenuItem>
+	);
+});

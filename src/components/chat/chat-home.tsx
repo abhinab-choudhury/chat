@@ -120,22 +120,17 @@ export function ChatHome() {
 					setGeneratingTitle(threadId, false);
 				});
 
-			const sendPromise = chatData
-				.sendMessage({
-					clientUuid: crypto.randomUUID(),
-					threadId,
-					role: "user",
-					content: trimmed,
-					userId,
-				})
-				.catch((err) => {
-					console.error("Failed to persist initial message", err);
-				});
+			await chatData.sendMessage({
+				clientUuid: crypto.randomUUID(),
+				threadId,
+				role: "user",
+				content: trimmed,
+				userId,
+			});
 
 			setPendingInitialMessage(trimmed);
 			setPendingAutoSend(true);
 			void navigate({ to: "/thread/$threadId", params: { threadId } });
-			await sendPromise;
 		} catch (e) {
 			console.error(e);
 			setOptimisticMessage(null);

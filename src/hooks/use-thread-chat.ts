@@ -278,20 +278,33 @@ export function useThreadChat(threadId: string): UseThreadChatResult {
 		],
 	);
 
-	// First message of a new thread: the home screen queued an auto-send for us.
+	// Defer the claim until effect setup survives Strict Mode's setup/cleanup replay.
 	React.useEffect(() => {
-		if (
-			pendingAutoSend &&
-			isOwner &&
-			thread !== undefined &&
-			thread !== null &&
-			!autoSentRef.current
-		) {
+		if (!pendingAutoSend || busy || !isOwner || !thread || autoSentRef.current)
+			return;
+		let cancelled = false;
+		queueMicrotask(() => {
+			if (
+				cancelled ||
+				autoSentRef.current ||
+				!useChatStore.getState().pendingAutoSend
+			)
+				return;
 			autoSentRef.current = true;
 			setPendingAutoSend(false);
 			void handleSubmit(undefined, false);
-		}
-	}, [pendingAutoSend, isOwner, thread, handleSubmit, setPendingAutoSend]);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		pendingAutoSend,
+		busy,
+		isOwner,
+		thread,
+		handleSubmit,
+		setPendingAutoSend,
+	]);
 
 	// Resume an in-flight stream after a reconnect/reload.
 	React.useEffect(() => {

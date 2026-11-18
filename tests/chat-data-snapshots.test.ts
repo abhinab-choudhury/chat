@@ -63,3 +63,43 @@ test("chat snapshots expose stored data and change reference when it changes", (
 		messages,
 	);
 });
+
+test("thread refresh preserves order and references until actual activity changes", async () => {
+	const { mergeThreadSnapshot } = await import("../src/lib/chat-data");
+	const thread = (id: string, updatedAt: number): Thread => ({
+		_id: id,
+		title: id,
+		userId: "browser",
+		createdAt: 1,
+		updatedAt,
+	});
+	const previous = [thread("a", 20), thread("b", 10)];
+	assert.equal(
+		mergeThreadSnapshot(previous, [{ ...previous[0] }], "a"),
+		previous,
+	);
+	assert.equal(
+		mergeThreadSnapshot(previous, previous.map((t) => ({ ...t })).reverse()),
+		previous,
+	);
+	const changed = mergeThreadSnapshot(
+		previous,
+		[{ ...previous[1], updatedAt: 30 }],
+		"b",
+	);
+	assert.deepEqual(
+		changed.map((t) => t._id),
+		["b", "a"],
+	);
+	assert.equal(changed[1], previous[0]);
+	assert.deepEqual(
+		mergeThreadSnapshot([], [thread("b", 10), thread("a", 10)]).map(
+			(t) => t._id,
+		),
+		["a", "b"],
+	);
+	assert.deepEqual(
+		mergeThreadSnapshot(previous, [], "a").map((t) => t._id),
+		["b"],
+	);
+});

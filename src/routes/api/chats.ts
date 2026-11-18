@@ -4,12 +4,15 @@ import { z } from "zod";
 import { db } from "#/database";
 import { chatMessages, chatThreads } from "#/database/chats";
 import { memoryEpisodes, memoryFacts, memoryJobs } from "#/database/memory";
+import { errorMetadata } from "#/lib/agent/logging";
+import { withApiLogging } from "#/lib/api-logging.server";
 import {
 	BrowserIdentityError,
 	ownedThread,
 	recoverAbandonedStream,
 	requestUserId,
 } from "#/lib/chat-persistence.server";
+import { serverLog } from "#/lib/server-logging";
 
 const mutation = z.discriminatedUnion("op", [
 	z.object({ op: z.literal("forgetMemory"), episodeId: z.string() }),
@@ -47,7 +50,7 @@ const mutation = z.discriminatedUnion("op", [
 export const Route = createFileRoute("/api/chats")({
 	server: {
 		handlers: {
-			GET: async ({ request }) => {
+			GET: withApiLogging("/api/chats", async ({ request }) => {
 				try {
 					const userId = requestUserId(request);
 					const threadId = new URL(request.url).searchParams.get("threadId");
@@ -98,7 +101,7 @@ export const Route = createFileRoute("/api/chats")({
 									)
 								: eq(chatThreads.userId, userId),
 						)
-						.orderBy(desc(chatThreads.updatedAt));
+						.orderBy(desc(chatThreads.updatedAt), asc(chatThreads.id));
 					for (let i = 0; i < threads.length; i++)
 						threads[i] = await recoverAbandonedStream(threads[i]);
 					const messages =
@@ -134,14 +137,14 @@ export const Route = createFileRoute("/api/chats")({
 							},
 							{ status: 401 },
 						);
-					console.error("[chats] request failed", error);
+					serverLog("error", "api", "chats.failed", errorMetadata(error));
 					return Response.json(
 						{ message: "Unable to load chats" },
 						{ status: 500 },
 					);
 				}
-			},
-			POST: async ({ request }) => {
+			}),
+			POST: withApiLogging("/api/chats", async ({ request }) => {
 				try {
 					const userId = requestUserId(request);
 					const parsed = mutation.safeParse(await request.json());
@@ -278,13 +281,13 @@ export const Route = createFileRoute("/api/chats")({
 							},
 							{ status: 401 },
 						);
-					console.error("[chats] request failed", error);
+					serverLog("error", "api", "chats.failed", errorMetadata(error));
 					return Response.json(
 						{ message: "Unable to save chat" },
 						{ status: 500 },
 					);
 				}
-			},
+			}),
 		},
 	},
 });

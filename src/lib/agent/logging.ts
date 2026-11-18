@@ -1,3 +1,5 @@
+import { requestLogContext, serverLog } from "../server-logging";
+
 /** Server-only call sites. Never pass prompts, output, credentials or provider errors as fields. */
 type LogFields = Record<string, string | number | boolean | null | undefined>;
 
@@ -7,16 +9,12 @@ export function createAgentLogger(
 ) {
 	const started = Date.now();
 	function write(level: "error", event: string, fields: LogFields = {}) {
-		console[level](
-			JSON.stringify({
-				...fields,
-				scope: "agent",
-				service,
-				requestId,
-				event,
-				elapsedMs: Date.now() - started,
-			}),
-		);
+		serverLog(level, "agent", event, {
+			...fields,
+			service,
+			requestId: requestLogContext.getStore()?.requestId ?? requestId,
+			elapsedMs: Date.now() - started,
+		});
 	}
 	return {
 		error: (event: string, error: unknown, fields?: LogFields) =>

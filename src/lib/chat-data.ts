@@ -376,11 +376,32 @@ export function useThreads(userId: string | null) {
 export function useThread(threadId: string | undefined) {
 	useEffect(() => {
 		if (!threadId) return;
-		void refreshChats(threadId).catch(console.error);
-		const timer = setInterval(() => {
-			void refreshChats(threadId).catch(console.error);
-		}, 1500);
-		return () => clearInterval(timer);
+		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout>;
+		let failures = 0;
+		const poll = async () => {
+			try {
+				if (typeof document === "undefined" || !document.hidden) {
+					await refreshChats(threadId);
+					failures = 0;
+				}
+			} catch (error) {
+				failures++;
+				console.error(error);
+			}
+			if (!cancelled) {
+				const live = useChatDataStore.getState().getThread(threadId)?.isLive;
+				timer = setTimeout(
+					poll,
+					Math.min(60000, (live ? 5000 : 30000) * 2 ** failures),
+				);
+			}
+		};
+		void poll();
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+		};
 	}, [threadId]);
 	return useChatDataStore((state) => {
 		if (!threadId) return undefined;
@@ -397,8 +418,48 @@ export function useMessages(threadId: string | undefined) {
 }
 
 // Postgres is authoritative; Zustand is the browser view/cache.
-export async function refreshChats(threadId?: string) {
-	getCurrentUserId();
+/** Preserve references when a server snapshot has not changed. */
+function reconcile<T extends { _id: string }>(
+	previous: T[],
+	incoming: T[],
+): T[] {
+	const byId = new Map(previous.map((item) => [item._id, item]));
+	const next = incoming.map((item) => {
+		const old = byId.get(item._id);
+		return old && JSON.stringify(old) === JSON.stringify(item) ? old : item;
+	});
+	return previous.length === next.length &&
+		next.every((item, i) => item === previous[i])
+		? previous
+		: next;
+}
+
+export function mergeThreadSnapshot(
+	previous: Thread[],
+	incoming: Thread[],
+	threadId?: string,
+) {
+	const combined = threadId
+		? [...previous.filter((t) => t._id !== threadId), ...incoming]
+		: [...incoming];
+	combined.sort(
+		(a, b) => b.updatedAt - a.updatedAt || a._id.localeCompare(b._id),
+	);
+	return reconcile(previous, combined);
+}
+
+const refreshes = new Map<string, Promise<void>>();
+export function refreshChats(threadId?: string): Promise<void> {
+	const userId = getCurrentUserId();
+	const key = `${userId}:${threadId ?? "*"}`;
+	const pending = refreshes.get(key);
+	if (pending) return pending;
+	const task = loadChats(userId, threadId).finally(() => refreshes.delete(key));
+	refreshes.set(key, task);
+	return task;
+}
+
+async function loadChats(userId: string, threadId?: string) {
 	const response = await fetch(
 		`/api/chats${threadId ? `?threadId=${encodeURIComponent(threadId)}` : ""}`,
 	);
@@ -408,34 +469,24 @@ export async function refreshChats(threadId?: string) {
 		messages: Message[];
 	};
 	useChatDataStore.setState((state) => {
-		const threadsByUser = { ...state.threadsByUser };
-		if (threadId) {
-			for (const userId of Object.keys(threadsByUser))
-				threadsByUser[userId] = threadsByUser[userId].filter(
-					(t) => t._id !== threadId,
-				);
-			for (const thread of data.threads)
-				threadsByUser[thread.userId] = [
-					...(threadsByUser[thread.userId] ?? []),
-					thread,
-				];
-		} else {
-			threadsByUser[getCurrentUserId()] = data.threads;
-			for (const thread of data.threads)
-				threadsByUser[thread.userId] = data.threads.filter(
-					(t) => t.userId === thread.userId,
-				);
-		}
+		const previous = state.threadsByUser[userId] ?? EMPTY_THREADS;
+		const threads = mergeThreadSnapshot(previous, data.threads, threadId);
+		const previousMessages = threadId
+			? (state.messagesByThread[threadId] ?? EMPTY_MESSAGES)
+			: EMPTY_MESSAGES;
+		const messages = threadId
+			? reconcile(previousMessages, data.messages)
+			: previousMessages;
+		if (threads === previous && messages === previousMessages) return state;
 		return {
-			threadsByUser,
-			...(threadId
-				? {
-						messagesByThread: {
-							...state.messagesByThread,
-							[threadId]: data.messages,
-						},
-					}
-				: {}),
+			threadsByUser:
+				threads === previous
+					? state.threadsByUser
+					: { ...state.threadsByUser, [userId]: threads },
+			messagesByThread:
+				!threadId || messages === previousMessages
+					? state.messagesByThread
+					: { ...state.messagesByThread, [threadId]: messages },
 		};
 	});
 }
